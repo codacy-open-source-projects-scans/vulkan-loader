@@ -290,6 +290,9 @@ typedef struct VkLayerInstanceDispatchTable_ {
 
     // ---- VK_NV_optical_flow extension commands
     PFN_vkGetPhysicalDeviceOpticalFlowImageFormatsNV GetPhysicalDeviceOpticalFlowImageFormatsNV;
+
+    // ---- VK_NV_cooperative_matrix2 extension commands
+    PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV;
 } VkLayerInstanceDispatchTable;
 
 // Device function pointer dispatch table
@@ -490,6 +493,27 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkGetDeviceBufferMemoryRequirements GetDeviceBufferMemoryRequirements;
     PFN_vkGetDeviceImageMemoryRequirements GetDeviceImageMemoryRequirements;
     PFN_vkGetDeviceImageSparseMemoryRequirements GetDeviceImageSparseMemoryRequirements;
+
+    // ---- Core Vulkan 1.4 commands
+    PFN_vkCmdSetLineStipple CmdSetLineStipple;
+    PFN_vkMapMemory2 MapMemory2;
+    PFN_vkUnmapMemory2 UnmapMemory2;
+    PFN_vkCmdBindIndexBuffer2 CmdBindIndexBuffer2;
+    PFN_vkGetRenderingAreaGranularity GetRenderingAreaGranularity;
+    PFN_vkGetDeviceImageSubresourceLayout GetDeviceImageSubresourceLayout;
+    PFN_vkGetImageSubresourceLayout2 GetImageSubresourceLayout2;
+    PFN_vkCmdPushDescriptorSet CmdPushDescriptorSet;
+    PFN_vkCmdPushDescriptorSetWithTemplate CmdPushDescriptorSetWithTemplate;
+    PFN_vkCmdSetRenderingAttachmentLocations CmdSetRenderingAttachmentLocations;
+    PFN_vkCmdSetRenderingInputAttachmentIndices CmdSetRenderingInputAttachmentIndices;
+    PFN_vkCmdBindDescriptorSets2 CmdBindDescriptorSets2;
+    PFN_vkCmdPushConstants2 CmdPushConstants2;
+    PFN_vkCmdPushDescriptorSet2 CmdPushDescriptorSet2;
+    PFN_vkCmdPushDescriptorSetWithTemplate2 CmdPushDescriptorSetWithTemplate2;
+    PFN_vkCopyMemoryToImage CopyMemoryToImage;
+    PFN_vkCopyImageToMemory CopyImageToMemory;
+    PFN_vkCopyImageToImage CopyImageToImage;
+    PFN_vkTransitionImageLayout TransitionImageLayout;
 
     // ---- VK_KHR_swapchain extension commands
     PFN_vkCreateSwapchainKHR CreateSwapchainKHR;
@@ -724,6 +748,7 @@ typedef struct VkLayerDispatchTable_ {
 
     // ---- VK_NVX_image_view_handle extension commands
     PFN_vkGetImageViewHandleNVX GetImageViewHandleNVX;
+    PFN_vkGetImageViewHandle64NVX GetImageViewHandle64NVX;
     PFN_vkGetImageViewAddressNVX GetImageViewAddressNVX;
 
     // ---- VK_AMD_draw_indirect_count extension commands
