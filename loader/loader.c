@@ -633,6 +633,13 @@ VkResult fixup_library_binary_path(const struct loader_instance *inst, char **li
     }
 
     if (NULL != os_determined_lib_name) {
+        // Normalize the path so that the comparison doesn't yield false positives
+        res = normalize_path(inst, &os_determined_lib_name);
+        if (res == VK_ERROR_OUT_OF_HOST_MEMORY) {
+            loader_instance_heap_free(inst, os_determined_lib_name);
+            return res;
+        }
+
         if (0 != strcmp(os_determined_lib_name, *lib_name)) {
             // Paths do not match, so we need to replace lib_name with the real path
             if (!system_path) {
@@ -2258,13 +2265,16 @@ VkResult loader_scanned_icd_add(const struct loader_instance *inst, struct loade
         loader_log(inst, VULKAN_LOADER_ERROR_BIT, 0, "loader_scanned_icd_add: Out of memory can't add ICD %s", filename);
         goto out;
     }
-    icd_tramp_list->count++;
 
     // Uses OS calls to find the 'true' path to the binary, for more accurate logging later on.
     res = fixup_library_binary_path(inst, &(new_scanned_icd->lib_name), new_scanned_icd->handle, fp_get_proc_addr);
     if (res == VK_ERROR_OUT_OF_HOST_MEMORY) {
+        loader_instance_heap_free(inst, new_scanned_icd->lib_name);
         goto out;
     }
+
+    icd_tramp_list->count++;
+
 out:
     if (res != VK_SUCCESS) {
         if (NULL != handle) {
@@ -2765,6 +2775,7 @@ VkResult loader_read_layer_json(const struct loader_instance *inst, struct loade
         loader_log(inst, VULKAN_LOADER_WARN_BIT, 0,
                    "Layer located at %s didn't find required layer value \"type\" in manifest JSON file, skipping this layer",
                    filename);
+        result = VK_ERROR_INITIALIZATION_FAILED;
         goto out;
     }
 
