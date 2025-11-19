@@ -317,11 +317,12 @@ VkResult increase_str_capacity_by_at_least_one(const struct loader_instance *ins
         }
     } else if (string_list->count + 1 > string_list->allocated_count) {
         uint32_t new_allocated_count = string_list->allocated_count * 2;
-        string_list->list = loader_instance_heap_realloc(inst, string_list->list, sizeof(char *) * string_list->allocated_count,
-                                                         sizeof(char *) * new_allocated_count, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-        if (NULL == string_list->list) {
+        void *new_ptr = loader_instance_heap_realloc(inst, string_list->list, sizeof(char *) * string_list->allocated_count,
+                                                     sizeof(char *) * new_allocated_count, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+        if (NULL == new_ptr) {
             return VK_ERROR_OUT_OF_HOST_MEMORY;
         }
+        string_list->list = new_ptr;
         string_list->allocated_count *= 2;
     }
     return VK_SUCCESS;
@@ -445,11 +446,13 @@ VkResult normalize_path(const struct loader_instance *inst, char **passed_in_pat
     // If path_len wasn't big enough, need to realloc and call again
     // actual_len doesn't include null terminator
     if (actual_len + 1 > path_len) {
-        path = loader_instance_heap_realloc(inst, path, path_len, actual_len + 1, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-        if (NULL == path) {
+        char *new_path = loader_instance_heap_realloc(inst, path, path_len, actual_len + 1, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+        if (NULL == new_path) {
+            loader_instance_heap_free(inst, path);
             res = VK_ERROR_OUT_OF_HOST_MEMORY;
             goto out;
         }
+        path = new_path;
         // store the updated allocation size (sans null terminator)
         path_len = actual_len + 1;
 
@@ -1043,12 +1046,13 @@ VkResult loader_init_generic_list(const struct loader_instance *inst, struct loa
 }
 
 VkResult loader_resize_generic_list(const struct loader_instance *inst, struct loader_generic_list *list_info) {
-    list_info->list = loader_instance_heap_realloc(inst, list_info->list, list_info->capacity, list_info->capacity * 2,
-                                                   VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-    if (list_info->list == NULL) {
+    void *new_ptr = loader_instance_heap_realloc(inst, list_info->list, list_info->capacity, list_info->capacity * 2,
+                                                 VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+    if (new_ptr == NULL) {
         loader_log(inst, VULKAN_LOADER_ERROR_BIT, 0, "loader_resize_generic_list: Failed to allocate space for generic list");
         return VK_ERROR_OUT_OF_HOST_MEMORY;
     }
+    list_info->list = new_ptr;
     list_info->capacity = list_info->capacity * 2;
     return VK_SUCCESS;
 }
