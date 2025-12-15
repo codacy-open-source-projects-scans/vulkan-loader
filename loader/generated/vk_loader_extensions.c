@@ -959,6 +959,12 @@ VKAPI_ATTR void VKAPI_CALL loader_init_device_extension_dispatch_table(struct lo
     table->GetQueueCheckpointDataNV = (PFN_vkGetQueueCheckpointDataNV)gdpa(dev, "vkGetQueueCheckpointDataNV");
     table->GetQueueCheckpointData2NV = (PFN_vkGetQueueCheckpointData2NV)gdpa(dev, "vkGetQueueCheckpointData2NV");
 
+    // ---- VK_EXT_present_timing extension commands
+    table->SetSwapchainPresentTimingQueueSizeEXT = (PFN_vkSetSwapchainPresentTimingQueueSizeEXT)gdpa(dev, "vkSetSwapchainPresentTimingQueueSizeEXT");
+    table->GetSwapchainTimingPropertiesEXT = (PFN_vkGetSwapchainTimingPropertiesEXT)gdpa(dev, "vkGetSwapchainTimingPropertiesEXT");
+    table->GetSwapchainTimeDomainPropertiesEXT = (PFN_vkGetSwapchainTimeDomainPropertiesEXT)gdpa(dev, "vkGetSwapchainTimeDomainPropertiesEXT");
+    table->GetPastPresentationTimingEXT = (PFN_vkGetPastPresentationTimingEXT)gdpa(dev, "vkGetPastPresentationTimingEXT");
+
     // ---- VK_INTEL_performance_query extension commands
     table->InitializePerformanceApiINTEL = (PFN_vkInitializePerformanceApiINTEL)gdpa(dev, "vkInitializePerformanceApiINTEL");
     table->UninitializePerformanceApiINTEL = (PFN_vkUninitializePerformanceApiINTEL)gdpa(dev, "vkUninitializePerformanceApiINTEL");
@@ -1348,6 +1354,9 @@ VKAPI_ATTR void VKAPI_CALL loader_init_device_extension_dispatch_table(struct lo
 
     // ---- VK_EXT_custom_resolve extension commands
     table->CmdBeginCustomResolveEXT = (PFN_vkCmdBeginCustomResolveEXT)gdpa(dev, "vkCmdBeginCustomResolveEXT");
+
+    // ---- VK_NV_compute_occupancy_priority extension commands
+    table->CmdSetComputeOccupancyPriorityNV = (PFN_vkCmdSetComputeOccupancyPriorityNV)gdpa(dev, "vkCmdSetComputeOccupancyPriorityNV");
 
     // ---- VK_KHR_acceleration_structure extension commands
     table->CreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)gdpa(dev, "vkCreateAccelerationStructureKHR");
@@ -2957,6 +2966,12 @@ VKAPI_ATTR void* VKAPI_CALL loader_lookup_device_dispatch_table(const VkLayerDis
     if (!strcmp(name, "GetQueueCheckpointDataNV")) return (void *)table->GetQueueCheckpointDataNV;
     if (!strcmp(name, "GetQueueCheckpointData2NV")) return (void *)table->GetQueueCheckpointData2NV;
 
+    // ---- VK_EXT_present_timing extension commands
+    if (!strcmp(name, "SetSwapchainPresentTimingQueueSizeEXT")) return (void *)table->SetSwapchainPresentTimingQueueSizeEXT;
+    if (!strcmp(name, "GetSwapchainTimingPropertiesEXT")) return (void *)table->GetSwapchainTimingPropertiesEXT;
+    if (!strcmp(name, "GetSwapchainTimeDomainPropertiesEXT")) return (void *)table->GetSwapchainTimeDomainPropertiesEXT;
+    if (!strcmp(name, "GetPastPresentationTimingEXT")) return (void *)table->GetPastPresentationTimingEXT;
+
     // ---- VK_INTEL_performance_query extension commands
     if (!strcmp(name, "InitializePerformanceApiINTEL")) return (void *)table->InitializePerformanceApiINTEL;
     if (!strcmp(name, "UninitializePerformanceApiINTEL")) return (void *)table->UninitializePerformanceApiINTEL;
@@ -3346,6 +3361,9 @@ VKAPI_ATTR void* VKAPI_CALL loader_lookup_device_dispatch_table(const VkLayerDis
 
     // ---- VK_EXT_custom_resolve extension commands
     if (!strcmp(name, "CmdBeginCustomResolveEXT")) return (void *)table->CmdBeginCustomResolveEXT;
+
+    // ---- VK_NV_compute_occupancy_priority extension commands
+    if (!strcmp(name, "CmdSetComputeOccupancyPriorityNV")) return (void *)table->CmdSetComputeOccupancyPriorityNV;
 
     // ---- VK_KHR_acceleration_structure extension commands
     if (!strcmp(name, "CreateAccelerationStructureKHR")) return (void *)table->CreateAccelerationStructureKHR;
@@ -7345,6 +7363,67 @@ VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointData2NV(
 }
 
 
+// ---- VK_EXT_present_timing extension trampoline/terminators
+
+VKAPI_ATTR VkResult VKAPI_CALL SetSwapchainPresentTimingQueueSizeEXT(
+    VkDevice                                    device,
+    VkSwapchainKHR                              swapchain,
+    uint32_t                                    size) {
+    const VkLayerDispatchTable *disp = loader_get_dispatch(device);
+    if (NULL == disp) {
+        loader_log(NULL, VULKAN_LOADER_FATAL_ERROR_BIT | VULKAN_LOADER_ERROR_BIT | VULKAN_LOADER_VALIDATION_BIT, 0,
+                   "vkSetSwapchainPresentTimingQueueSizeEXT: Invalid device "
+                   "[VUID-vkSetSwapchainPresentTimingQueueSizeEXT-device-parameter]");
+        abort(); /* Intentionally fail so user can correct issue. */
+    }
+    return disp->SetSwapchainPresentTimingQueueSizeEXT(device, swapchain, size);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL GetSwapchainTimingPropertiesEXT(
+    VkDevice                                    device,
+    VkSwapchainKHR                              swapchain,
+    VkSwapchainTimingPropertiesEXT*             pSwapchainTimingProperties,
+    uint64_t*                                   pSwapchainTimingPropertiesCounter) {
+    const VkLayerDispatchTable *disp = loader_get_dispatch(device);
+    if (NULL == disp) {
+        loader_log(NULL, VULKAN_LOADER_FATAL_ERROR_BIT | VULKAN_LOADER_ERROR_BIT | VULKAN_LOADER_VALIDATION_BIT, 0,
+                   "vkGetSwapchainTimingPropertiesEXT: Invalid device "
+                   "[VUID-vkGetSwapchainTimingPropertiesEXT-device-parameter]");
+        abort(); /* Intentionally fail so user can correct issue. */
+    }
+    return disp->GetSwapchainTimingPropertiesEXT(device, swapchain, pSwapchainTimingProperties, pSwapchainTimingPropertiesCounter);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL GetSwapchainTimeDomainPropertiesEXT(
+    VkDevice                                    device,
+    VkSwapchainKHR                              swapchain,
+    VkSwapchainTimeDomainPropertiesEXT*         pSwapchainTimeDomainProperties,
+    uint64_t*                                   pTimeDomainsCounter) {
+    const VkLayerDispatchTable *disp = loader_get_dispatch(device);
+    if (NULL == disp) {
+        loader_log(NULL, VULKAN_LOADER_FATAL_ERROR_BIT | VULKAN_LOADER_ERROR_BIT | VULKAN_LOADER_VALIDATION_BIT, 0,
+                   "vkGetSwapchainTimeDomainPropertiesEXT: Invalid device "
+                   "[VUID-vkGetSwapchainTimeDomainPropertiesEXT-device-parameter]");
+        abort(); /* Intentionally fail so user can correct issue. */
+    }
+    return disp->GetSwapchainTimeDomainPropertiesEXT(device, swapchain, pSwapchainTimeDomainProperties, pTimeDomainsCounter);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL GetPastPresentationTimingEXT(
+    VkDevice                                    device,
+    const VkPastPresentationTimingInfoEXT*      pPastPresentationTimingInfo,
+    VkPastPresentationTimingPropertiesEXT*      pPastPresentationTimingProperties) {
+    const VkLayerDispatchTable *disp = loader_get_dispatch(device);
+    if (NULL == disp) {
+        loader_log(NULL, VULKAN_LOADER_FATAL_ERROR_BIT | VULKAN_LOADER_ERROR_BIT | VULKAN_LOADER_VALIDATION_BIT, 0,
+                   "vkGetPastPresentationTimingEXT: Invalid device "
+                   "[VUID-vkGetPastPresentationTimingEXT-device-parameter]");
+        abort(); /* Intentionally fail so user can correct issue. */
+    }
+    return disp->GetPastPresentationTimingEXT(device, pPastPresentationTimingInfo, pPastPresentationTimingProperties);
+}
+
+
 // ---- VK_INTEL_performance_query extension trampoline/terminators
 
 VKAPI_ATTR VkResult VKAPI_CALL InitializePerformanceApiINTEL(
@@ -11082,6 +11161,22 @@ VKAPI_ATTR void VKAPI_CALL CmdBeginCustomResolveEXT(
 }
 
 
+// ---- VK_NV_compute_occupancy_priority extension trampoline/terminators
+
+VKAPI_ATTR void VKAPI_CALL CmdSetComputeOccupancyPriorityNV(
+    VkCommandBuffer                             commandBuffer,
+    const VkComputeOccupancyPriorityParametersNV* pParameters) {
+    const VkLayerDispatchTable *disp = loader_get_dispatch(commandBuffer);
+    if (NULL == disp) {
+        loader_log(NULL, VULKAN_LOADER_FATAL_ERROR_BIT | VULKAN_LOADER_ERROR_BIT | VULKAN_LOADER_VALIDATION_BIT, 0,
+                   "vkCmdSetComputeOccupancyPriorityNV: Invalid commandBuffer "
+                   "[VUID-vkCmdSetComputeOccupancyPriorityNV-commandBuffer-parameter]");
+        abort(); /* Intentionally fail so user can correct issue. */
+    }
+    disp->CmdSetComputeOccupancyPriorityNV(commandBuffer, pParameters);
+}
+
+
 // ---- VK_KHR_acceleration_structure extension trampoline/terminators
 
 VKAPI_ATTR VkResult VKAPI_CALL CreateAccelerationStructureKHR(
@@ -12623,6 +12718,24 @@ bool extension_instance_gpa(struct loader_instance *ptr_instance, const char *na
         return true;
     }
 
+    // ---- VK_EXT_present_timing extension commands
+    if (!strcmp("vkSetSwapchainPresentTimingQueueSizeEXT", name)) {
+        *addr = (void *)SetSwapchainPresentTimingQueueSizeEXT;
+        return true;
+    }
+    if (!strcmp("vkGetSwapchainTimingPropertiesEXT", name)) {
+        *addr = (void *)GetSwapchainTimingPropertiesEXT;
+        return true;
+    }
+    if (!strcmp("vkGetSwapchainTimeDomainPropertiesEXT", name)) {
+        *addr = (void *)GetSwapchainTimeDomainPropertiesEXT;
+        return true;
+    }
+    if (!strcmp("vkGetPastPresentationTimingEXT", name)) {
+        *addr = (void *)GetPastPresentationTimingEXT;
+        return true;
+    }
+
     // ---- VK_INTEL_performance_query extension commands
     if (!strcmp("vkInitializePerformanceApiINTEL", name)) {
         *addr = (void *)InitializePerformanceApiINTEL;
@@ -13758,6 +13871,12 @@ bool extension_instance_gpa(struct loader_instance *ptr_instance, const char *na
     // ---- VK_EXT_custom_resolve extension commands
     if (!strcmp("vkCmdBeginCustomResolveEXT", name)) {
         *addr = (void *)CmdBeginCustomResolveEXT;
+        return true;
+    }
+
+    // ---- VK_NV_compute_occupancy_priority extension commands
+    if (!strcmp("vkCmdSetComputeOccupancyPriorityNV", name)) {
+        *addr = (void *)CmdSetComputeOccupancyPriorityNV;
         return true;
     }
 

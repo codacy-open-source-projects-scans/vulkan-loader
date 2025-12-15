@@ -921,6 +921,12 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkGetQueueCheckpointDataNV GetQueueCheckpointDataNV;
     PFN_vkGetQueueCheckpointData2NV GetQueueCheckpointData2NV;
 
+    // ---- VK_EXT_present_timing extension commands
+    PFN_vkSetSwapchainPresentTimingQueueSizeEXT SetSwapchainPresentTimingQueueSizeEXT;
+    PFN_vkGetSwapchainTimingPropertiesEXT GetSwapchainTimingPropertiesEXT;
+    PFN_vkGetSwapchainTimeDomainPropertiesEXT GetSwapchainTimeDomainPropertiesEXT;
+    PFN_vkGetPastPresentationTimingEXT GetPastPresentationTimingEXT;
+
     // ---- VK_INTEL_performance_query extension commands
     PFN_vkInitializePerformanceApiINTEL InitializePerformanceApiINTEL;
     PFN_vkUninitializePerformanceApiINTEL UninitializePerformanceApiINTEL;
@@ -1310,6 +1316,9 @@ typedef struct VkLayerDispatchTable_ {
 
     // ---- VK_EXT_custom_resolve extension commands
     PFN_vkCmdBeginCustomResolveEXT CmdBeginCustomResolveEXT;
+
+    // ---- VK_NV_compute_occupancy_priority extension commands
+    PFN_vkCmdSetComputeOccupancyPriorityNV CmdSetComputeOccupancyPriorityNV;
 
     // ---- VK_KHR_acceleration_structure extension commands
     PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;

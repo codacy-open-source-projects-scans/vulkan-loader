@@ -480,6 +480,10 @@ static inline void layer_init_device_dispatch_table(VkDevice device, VkLayerDisp
     table->CmdSetCheckpointNV = (PFN_vkCmdSetCheckpointNV)gpa(device, "vkCmdSetCheckpointNV");
     table->GetQueueCheckpointDataNV = (PFN_vkGetQueueCheckpointDataNV)gpa(device, "vkGetQueueCheckpointDataNV");
     table->GetQueueCheckpointData2NV = (PFN_vkGetQueueCheckpointData2NV)gpa(device, "vkGetQueueCheckpointData2NV");
+    table->SetSwapchainPresentTimingQueueSizeEXT = (PFN_vkSetSwapchainPresentTimingQueueSizeEXT)gpa(device, "vkSetSwapchainPresentTimingQueueSizeEXT");
+    table->GetSwapchainTimingPropertiesEXT = (PFN_vkGetSwapchainTimingPropertiesEXT)gpa(device, "vkGetSwapchainTimingPropertiesEXT");
+    table->GetSwapchainTimeDomainPropertiesEXT = (PFN_vkGetSwapchainTimeDomainPropertiesEXT)gpa(device, "vkGetSwapchainTimeDomainPropertiesEXT");
+    table->GetPastPresentationTimingEXT = (PFN_vkGetPastPresentationTimingEXT)gpa(device, "vkGetPastPresentationTimingEXT");
     table->InitializePerformanceApiINTEL = (PFN_vkInitializePerformanceApiINTEL)gpa(device, "vkInitializePerformanceApiINTEL");
     table->UninitializePerformanceApiINTEL = (PFN_vkUninitializePerformanceApiINTEL)gpa(device, "vkUninitializePerformanceApiINTEL");
     table->CmdSetPerformanceMarkerINTEL = (PFN_vkCmdSetPerformanceMarkerINTEL)gpa(device, "vkCmdSetPerformanceMarkerINTEL");
@@ -752,6 +756,7 @@ static inline void layer_init_device_dispatch_table(VkDevice device, VkLayerDisp
 #endif  // VK_USE_PLATFORM_METAL_EXT
     table->CmdEndRendering2EXT = (PFN_vkCmdEndRendering2EXT)gpa(device, "vkCmdEndRendering2EXT");
     table->CmdBeginCustomResolveEXT = (PFN_vkCmdBeginCustomResolveEXT)gpa(device, "vkCmdBeginCustomResolveEXT");
+    table->CmdSetComputeOccupancyPriorityNV = (PFN_vkCmdSetComputeOccupancyPriorityNV)gpa(device, "vkCmdSetComputeOccupancyPriorityNV");
     table->CreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)gpa(device, "vkCreateAccelerationStructureKHR");
     table->DestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)gpa(device, "vkDestroyAccelerationStructureKHR");
     table->CmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)gpa(device, "vkCmdBuildAccelerationStructuresKHR");
