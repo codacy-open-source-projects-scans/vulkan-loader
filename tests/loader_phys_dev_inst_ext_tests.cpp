@@ -59,7 +59,7 @@ void FillInRandomDeviceProps(VkPhysicalDeviceProperties& props, uint32_t api_ver
 // Test vkGetPhysicalDeviceProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -72,7 +72,7 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevProps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -86,7 +86,7 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2KHRNoICDSupport) {
 // Test vkGetPhysicalDeviceProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     FillInRandomDeviceProps(test_physical_device.properties, VK_API_VERSION_1_0, 5, 123);
@@ -122,7 +122,7 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -184,11 +184,10 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2Simple) {
         ASSERT_EQ(0, memcmp(props.pipelineCacheUUID, props2.properties.pipelineCacheUUID, VK_UUID_SIZE));
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1
         InstWrapper instance(env.vulkan_functions);
@@ -225,7 +224,7 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2Simple) {
 // extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -297,7 +296,8 @@ TEST(LoaderInstPhysDevExts, PhysDevProps2Mixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -413,7 +413,7 @@ void FillInRandomFeatures(VkPhysicalDeviceFeatures& feats) {
 // Test vkGetPhysicalDeviceFeatures2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevFeats2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -426,7 +426,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFeats2KHRNoSupport) {
 // Test vkGetPhysicalDeviceFeatures2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevFeatsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -440,7 +440,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFeatsKHRNoICDSupport) {
 // Test vkGetPhysicalDeviceFeatures2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevFeats2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomFeatures(test_physical_device.features);
@@ -469,7 +469,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFeats2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevFeats2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -518,11 +518,10 @@ TEST(LoaderInstPhysDevExts, PhysDevFeats2Simple) {
 
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -553,7 +552,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFeats2Simple) {
 // extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevFeats2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -612,7 +611,8 @@ TEST(LoaderInstPhysDevExts, PhysDevFeatsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -675,7 +675,7 @@ void FillInRandomFormatProperties(std::vector<VkFormatProperties>& props) {
 // Test vkGetPhysicalDeviceFormatProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevFormatProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -689,7 +689,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceFormatProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevFormatPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -704,7 +704,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatPropsKHRNoICDSupport) {
 // Test vkGetPhysicalDeviceFormatProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevFormatProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomFormatProperties(test_physical_device.format_properties);
@@ -740,7 +740,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevFormatProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -794,11 +794,10 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatProps2Simple) {
         ASSERT_EQ(props.optimalTilingFeatures, props2.formatProperties.optimalTilingFeatures);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -830,7 +829,7 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatProps2Simple) {
 // extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevFormatProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -895,7 +894,8 @@ TEST(LoaderInstPhysDevExts, PhysDevFormatPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -962,7 +962,7 @@ void FillInRandomImageFormatData(VkImageFormatProperties& props) {
 // Test vkGetPhysicalDeviceImageFormatProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -976,7 +976,7 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceImageFormatProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevImageFormatPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -991,7 +991,7 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatPropsKHRNoICDSupport) {
 // Test vkGetPhysicalDeviceImageFormatProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomImageFormatData(test_physical_device.image_format_properties);
@@ -1040,7 +1040,7 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -1129,11 +1129,10 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2Simple) {
         ASSERT_EQ(props.maxResourceSize, props2.imageFormatProperties.maxResourceSize);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -1184,7 +1183,7 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2Simple) {
 // and a device under that ICD also support, so everything should work and return properly.
 TEST(LoaderInstPhysDevExts, PhysDevImageFormatProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -1271,7 +1270,8 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -1344,7 +1344,7 @@ TEST(LoaderInstPhysDevExts, PhysDevImageFormatPropsMixed) {
 // Test vkGetPhysicalDeviceMemoryProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1358,7 +1358,7 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceMemoryProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevMemoryPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1387,7 +1387,7 @@ void FillInRandomMemoryData(VkPhysicalDeviceMemoryProperties& props) {
 // Test vkGetPhysicalDeviceMemoryProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomMemoryData(test_physical_device.memory_properties);
@@ -1418,7 +1418,7 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -1467,11 +1467,10 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2Simple) {
         ASSERT_EQ(props, props2);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -1502,7 +1501,7 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2Simple) {
 // extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevMemoryProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -1561,7 +1560,8 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -1615,7 +1615,7 @@ TEST(LoaderInstPhysDevExts, PhysDevMemoryPropsMixed) {
 // Test vkGetPhysicalDeviceQueueFamilyProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1629,7 +1629,7 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceQueueFamilyProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1659,7 +1659,7 @@ uint32_t FillInRandomQueueFamilyData(std::vector<MockQueueFamilyProperties>& pro
 // Test vkGetPhysicalDeviceQueueFamilyProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     uint32_t num_fam = FillInRandomQueueFamilyData(test_physical_device.queue_family_properties);
@@ -1699,7 +1699,7 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -1768,11 +1768,10 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2Simple) {
         ASSERT_EQ(props, props2);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -1813,7 +1812,7 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2Simple) {
 // extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -1887,7 +1886,8 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -1949,7 +1949,7 @@ TEST(LoaderInstPhysDevExts, PhysDevQueueFamilyPropsMixed) {
 // Test vkGetPhysicalDeviceSparseImageFormatProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1963,7 +1963,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceSparseImageFormatProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -1989,7 +1989,7 @@ void FillInRandomSparseImageFormatData(std::vector<VkSparseImageFormatProperties
 // Test vkGetPhysicalDeviceSparseImageFormatProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomSparseImageFormatData(test_physical_device.sparse_image_format_properties);
@@ -2043,7 +2043,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2KHRInstanceAndICDSuppo
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -2140,11 +2140,10 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2Simple) {
         ASSERT_EQ(props, props2);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -2199,7 +2198,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2Simple) {
 // supports extension but the instance supports 1.1 and the extension
 TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatProps2KHRInstanceSupports11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.extensions.push_back({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, 0});
@@ -2288,7 +2287,8 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -2370,7 +2370,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSparseImageFormatPropsMixed) {
 // Test vkGetPhysicalDeviceExternalBufferPropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevExtBufPropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2384,7 +2384,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtBufPropsKHRNoSupport) {
 // Test vkGetPhysicalDeviceExternalBufferPropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevExtBufPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2406,7 +2406,7 @@ void FillInRandomExtMemoryData(VkExternalMemoryProperties& props) {
 // Test vkGetPhysicalDeviceExternalBufferPropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevExtBufProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomExtMemoryData(test_physical_device.external_memory_properties);
@@ -2435,7 +2435,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtBufProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevExtBufProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -2483,11 +2483,10 @@ TEST(LoaderInstPhysDevExts, PhysDevExtBufProps2Simple) {
         ASSERT_EQ(VkExternalMemoryProperties{}, props.externalMemoryProperties);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -2533,7 +2532,8 @@ TEST(LoaderInstPhysDevExts, PhysDevExtBufPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -2617,7 +2617,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtBufPropsMixed) {
 // Test vkGetPhysicalDeviceExternalSemaphorePropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevExtSemPropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2631,7 +2631,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtSemPropsKHRNoSupport) {
 // Test vkGetPhysicalDeviceExternalSemaphorePropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevExtSemPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2655,7 +2655,7 @@ void FillInRandomExtSemData(VkExternalSemaphoreProperties& props) {
 // Test vkGetPhysicalDeviceExternalSemaphorePropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevExtSemProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomExtSemData(test_physical_device.external_semaphore_properties);
@@ -2684,7 +2684,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtSemProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevExtSemProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -2731,11 +2731,10 @@ TEST(LoaderInstPhysDevExts, PhysDevExtSemProps2Simple) {
         ASSERT_EQ(VkExternalSemaphoreProperties{}, props);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -2780,7 +2779,8 @@ TEST(LoaderInstPhysDevExts, PhysDevExtSemPropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -2863,7 +2863,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtSemPropsMixed) {
 // Test vkGetPhysicalDeviceExternalFencePropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevExtFencePropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2877,7 +2877,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtFencePropsKHRNoSupport) {
 // Test vkGetPhysicalDeviceExternalFencePropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevExtFencePropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -2901,7 +2901,7 @@ void FillInRandomExtFenceData(VkExternalFenceProperties& props) {
 // Test vkGetPhysicalDeviceExternalFencePropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevExtFenceProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomExtFenceData(test_physical_device.external_fence_properties);
@@ -2930,7 +2930,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtFenceProps2KHRInstanceAndICDSupport) {
 // Also check if the application didn't enable 1.1 and when a layer 'upgrades' the api version to 1.1
 TEST(LoaderInstPhysDevExts, PhysDevExtFenceProps2Simple) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).icd_api_version = VK_API_VERSION_1_1;
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
@@ -2978,11 +2978,10 @@ TEST(LoaderInstPhysDevExts, PhysDevExtFenceProps2Simple) {
         ASSERT_EQ(VkExternalFenceProperties{}, props);
         ASSERT_TRUE(log.find("Emulating call in ICD"));
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("modify_api_version_layer")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DisableEnvVar")),
-                           "modify_api_version_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("modify_api_version_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DisableEnvVar")));
     env.get_test_layer().set_alter_api_version(VK_API_VERSION_1_1);
     {  // Now do the same as above but with a layer that updates the version to 1.1 on behalf of the application
         InstWrapper instance(env.vulkan_functions);
@@ -3026,7 +3025,8 @@ TEST(LoaderInstPhysDevExts, PhysDevExtFencePropsMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
 
         // ICD 1 should not have 1.1
@@ -3109,7 +3109,7 @@ TEST(LoaderInstPhysDevExts, PhysDevExtFencePropsMixed) {
 // Test vkGetPhysicalDeviceSurfaceCapabilities2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3123,7 +3123,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceSurfaceCapabilities2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3155,7 +3155,7 @@ void FillInRandomSurfaceCapsData(VkSurfaceCapabilitiesKHR& props) {
 // Test vkGetPhysicalDeviceSurfaceCapabilities2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_SURFACE_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
     Extension third_ext{VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME};
@@ -3225,7 +3225,8 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRMixed) {
     Extension third_ext{VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME};
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.min_icd_interface_version = 3;
@@ -3301,7 +3302,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceCaps2KHRMixed) {
 // Test vkGetPhysicalDeviceSurfaceFormats2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3315,7 +3316,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRNoSupport) {
 // Test vkGetPhysicalDeviceSurfaceFormats2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3339,7 +3340,7 @@ void FillInRandomSurfaceFormatsData(std::vector<VkSurfaceFormatKHR>& props) {
 // Test vkGetPhysicalDeviceSurfaceFormats2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_SURFACE_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
     Extension third_ext{VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME};
@@ -3417,7 +3418,8 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRMixed) {
     Extension third_ext{VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME};
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.enable_icd_wsi = true;
@@ -3507,7 +3509,7 @@ TEST(LoaderInstPhysDevExts, PhysDevSurfaceFormats2KHRMixed) {
 // Test vkGetPhysicalDeviceDisplayPropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3521,7 +3523,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRNoSupport) {
 // Test vkGetPhysicalDeviceDisplayPropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3557,7 +3559,7 @@ void FillInRandomDisplayPropData(std::vector<VkDisplayPropertiesKHR>& props) {
 // Test vGetPhysicalDeviceDisplayPropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomDisplayPropData(test_physical_device.display_properties);
@@ -3606,7 +3608,8 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -3693,7 +3696,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPropsKHRMixed) {
 // Test vkGetPhysicalDeviceDisplayPlanePropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3707,7 +3710,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRNoSupport) {
 // Test vkGetPhysicalDeviceDisplayPlanePropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3731,7 +3734,7 @@ void FillInRandomDisplayPlanePropData(std::vector<VkDisplayPlanePropertiesKHR>& 
 // Test vGetPhysicalDeviceDisplayPlanePropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     FillInRandomDisplayPlanePropData(test_physical_device.display_plane_properties);
@@ -3780,7 +3783,8 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -3867,7 +3871,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlanePropsKHRMixed) {
 // Test vkGetDisplayPlaneSupportedDisplaysKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3881,7 +3885,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRNoSupport) {
 // Test vkGetDisplayPlaneSupportedDisplaysKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -3904,7 +3908,7 @@ void GenerateRandomDisplays(std::vector<VkDisplayKHR>& disps) {
 // Test vGetDisplayPlaneSupportedDisplaysKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     GenerateRandomDisplays(test_physical_device.displays);
@@ -3953,7 +3957,8 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -4040,7 +4045,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneSupDispsKHRMixed) {
 // Test vkGetDisplayModePropertiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispModePropsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4053,7 +4058,7 @@ TEST(LoaderInstPhysDevExts, GetDispModePropsKHRNoSupport) {
 // Test vkGetDisplayModePropertiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispModePropsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4078,7 +4083,7 @@ void GenerateRandomDisplayModeProps(std::vector<VkDisplayModePropertiesKHR>& dis
 // Test vGetDisplayModePropertiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispModePropsKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     GenerateRandomDisplayModeProps(test_physical_device.display_mode_properties);
@@ -4126,7 +4131,8 @@ TEST(LoaderInstPhysDevExts, GetDispModePropsKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -4213,7 +4219,7 @@ TEST(LoaderInstPhysDevExts, GetDispModePropsKHRMixed) {
 // Test vkCreateDisplayModeKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispModesKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4226,7 +4232,7 @@ TEST(LoaderInstPhysDevExts, GetDispModesKHRNoSupport) {
 // Test vkCreateDisplayModeKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispModesKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4240,7 +4246,7 @@ TEST(LoaderInstPhysDevExts, GetDispModesKHRNoICDSupport) {
 // Test vkCreateDisplayModeKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispModesKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device.display_mode = CreateRandomDisplayMode();
@@ -4283,7 +4289,8 @@ TEST(LoaderInstPhysDevExts, GetDispModesKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -4364,7 +4371,7 @@ TEST(LoaderInstPhysDevExts, GetDispModesKHRMixed) {
 // Test vkGetDisplayPlaneCapabilitiesKHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4377,7 +4384,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRNoSupport) {
 // Test vkGetDisplayPlaneCapabilitiesKHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4412,7 +4419,7 @@ void GenerateRandomDisplayPlaneCaps(VkDisplayPlaneCapabilitiesKHR& caps) {
 // Test vkGetDisplayPlaneCapabilitiesKHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
     auto& test_physical_device = env.get_test_icd(0).add_and_get_physical_device({});
     GenerateRandomDisplayPlaneCaps(test_physical_device.display_plane_capabilities);
@@ -4454,7 +4461,8 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
 
@@ -4535,7 +4543,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCapsKHRMixed) {
 // Test vkGetPhysicalDeviceDisplayProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4549,7 +4557,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceDisplayProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4564,7 +4572,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRNoICDSupport) {
 // Test vGetPhysicalDeviceDisplayProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -4624,7 +4632,8 @@ TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -4694,7 +4703,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispProps2KHRMixed) {
 // Test vkGetPhysicalDeviceDisplayPlaneProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4708,7 +4717,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRNoSupport) {
 // Test vkGetPhysicalDeviceDisplayPlaneProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4723,7 +4732,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRNoICDSupport) {
 // Test vGetPhysicalDeviceDisplayPlaneProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -4782,7 +4791,8 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -4851,7 +4861,7 @@ TEST(LoaderInstPhysDevExts, PhysDevDispPlaneProps2KHRMixed) {
 // Test vkGetDisplayModeProperties2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4864,7 +4874,7 @@ TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRNoSupport) {
 // Test vkGetDisplayModeProperties2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -4878,7 +4888,7 @@ TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRNoICDSupport) {
 // Test vGetDisplayModeProperties2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -4935,7 +4945,8 @@ TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -5002,7 +5013,7 @@ TEST(LoaderInstPhysDevExts, GetDispModeProps2KHRMixed) {
 // Test vkGetDisplayPlaneCapabilities2KHR where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5015,7 +5026,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRNoSupport) {
 // Test vkGetDisplayPlaneCapabilities2KHR where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5029,7 +5040,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRNoICDSupport) {
 // Test vkGetDisplayPlaneCapabilities2KHR where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -5078,7 +5089,8 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -5141,7 +5153,7 @@ TEST(LoaderInstPhysDevExts, GetDispPlaneCaps2KHRMixed) {
 // Test vkAcquireDrmDisplayEXT where nothing supports it.
 TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5154,7 +5166,7 @@ TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTNoSupport) {
 // Test vkAcquireDrmDisplayEXT where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5168,7 +5180,7 @@ TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTNoICDSupport) {
 // Test vkAcquireDrmDisplayEXT where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -5211,7 +5223,8 @@ TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -5291,7 +5304,7 @@ TEST(LoaderInstPhysDevExts, AcquireDrmDisplayEXTMixed) {
 // Test vkGetDrmDisplayEXT where nothing supports it.
 TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTNoSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5304,7 +5317,7 @@ TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTNoSupport) {
 // Test vkGetDrmDisplayEXT where instance supports it, but nothing else.
 TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTNoICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     env.get_test_icd(0).add_physical_device({});
 
     InstWrapper instance(env.vulkan_functions);
@@ -5318,7 +5331,7 @@ TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTNoICDSupport) {
 // Test vkGetDrmDisplayEXT where instance and ICD supports it, but device does not support it.
 TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTInstanceAndICDSupport) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     Extension first_ext{VK_KHR_DISPLAY_EXTENSION_NAME};
     Extension second_ext{VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME};
     env.get_test_icd(0).add_instance_extensions({first_ext, second_ext});
@@ -5362,7 +5375,8 @@ TEST(LoaderInstPhysDevExts, GetDrmDisplayEXTMixed) {
     const uint32_t max_phys_devs = 7;
 
     for (uint32_t icd = 0; icd < max_icd_count; ++icd) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {},
+                    ManifestICD{}.set_api_version(icd != 1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0));
         auto& cur_icd = env.get_test_icd(icd);
         cur_icd.icd_api_version = VK_API_VERSION_1_0;
         cur_icd.add_instance_extension({VK_KHR_DISPLAY_EXTENSION_NAME});
@@ -5444,17 +5458,17 @@ TEST(LoaderInstPhysDevExts, DifferentInstanceExtensions) {
     FrameworkEnvironment env{};
 
     // Add 3 drivers each of which supports a different instance extension
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(0).add_instance_extension({VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME});
     env.get_test_icd(0).add_and_get_physical_device({"pd0"}).extensions.push_back(
         {VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(1).add_instance_extension({VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME});
     env.get_test_icd(1).add_and_get_physical_device({"pd1"}).extensions.push_back(
         {VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(2).add_instance_extension({VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME});
     env.get_test_icd(2).add_and_get_physical_device({"pd2"}).extensions.push_back(
         {VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME, 0});
@@ -5499,13 +5513,13 @@ TEST(LoaderInstPhysDevExts, DifferentPhysicalDeviceExtensions) {
     FrameworkEnvironment env{};
 
     // Add 3 drivers each of which supports a different physical device extension
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(0).add_and_get_physical_device("pd0").extensions.push_back({VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(1).add_and_get_physical_device("pd1").extensions.push_back({VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(2).add_and_get_physical_device("pd2").extensions.push_back({VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, 0});
 
     DebugUtilsLogger log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT};

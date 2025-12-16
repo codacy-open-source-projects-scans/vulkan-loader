@@ -27,6 +27,7 @@
  * Author: Charles Giessen <charles@lunarg.com>
  */
 
+#include "manifest_builders.h"
 #include "test_environment.h"
 
 // Test case origin
@@ -38,7 +39,7 @@
 
 TEST(CreateInstance, BasicRun) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -47,7 +48,7 @@ TEST(CreateInstance, BasicRun) {
 // LX435
 TEST(CreateInstance, ConstInstanceInfo) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     VkInstance inst = VK_NULL_HANDLE;
     VkInstanceCreateInfo const info = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, nullptr, 0, nullptr, 0, nullptr, 0, nullptr};
     ASSERT_EQ(env.vulkan_functions.vkCreateInstance(&info, VK_NULL_HANDLE, &inst), VK_SUCCESS);
@@ -58,21 +59,21 @@ TEST(CreateInstance, ConstInstanceInfo) {
 // VUID-vkDestroyInstance-instance-parameter, VUID-vkDestroyInstance-pAllocator-parameter
 TEST(CreateInstance, DestroyInstanceNullHandle) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.vulkan_functions.vkDestroyInstance(VK_NULL_HANDLE, nullptr);
 }
 
 // VUID-vkDestroyDevice-device-parameter, VUID-vkDestroyDevice-pAllocator-parameter
 TEST(CreateInstance, DestroyDeviceNullHandle) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.vulkan_functions.vkDestroyDevice(VK_NULL_HANDLE, nullptr);
 }
 
 // VUID-vkCreateInstance-ppEnabledExtensionNames-01388
 TEST(CreateInstance, ExtensionNotPresent) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     {
         InstWrapper inst{env.vulkan_functions};
         inst.create_info.add_extension("VK_EXT_validation_features");  // test icd won't report this as supported
@@ -87,7 +88,7 @@ TEST(CreateInstance, ExtensionNotPresent) {
 
 TEST(CreateInstance, LayerNotPresent) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer("VK_NON_EXISTANT_LAYER");
     inst.CheckCreate(VK_ERROR_LAYER_NOT_PRESENT);
@@ -95,13 +96,12 @@ TEST(CreateInstance, LayerNotPresent) {
 
 TEST(CreateInstance, LayerPresent) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -110,14 +110,14 @@ TEST(CreateInstance, LayerPresent) {
 
 TEST(CreateInstance, RelativePaths) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}.set_library_path_type(LibraryPathType::relative)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2, ManifestOptions{}.set_library_path_type(LibraryPathType::relative))
+        .add_physical_device({});
 
     const char* layer_name = "VK_LAYER_TestLayer";
     env.add_explicit_layer(
-        TestLayerDetails{ManifestLayer{}.add_layer(
-                             ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-                         "test_layer.json"}
-            .set_library_path_type(LibraryPathType::relative));
+        ManifestOptions{}.set_library_path_type(LibraryPathType::relative),
+        ManifestLayer{}.add_layer(
+            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -129,7 +129,7 @@ TEST(CreateInstance, RelativePaths) {
 
 TEST(CreateInstance, ApiVersionBelow1_0) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     DebugUtilsLogger debug_log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT};
     InstWrapper inst{env.vulkan_functions};
@@ -144,7 +144,7 @@ TEST(CreateInstance, ApiVersionBelow1_0) {
 
 TEST(CreateInstance, ConsecutiveCreate) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     for (uint32_t i = 0; i < 100; i++) {
         InstWrapper inst{env.vulkan_functions};
@@ -154,7 +154,7 @@ TEST(CreateInstance, ConsecutiveCreate) {
 
 TEST(CreateInstance, ConsecutiveCreateWithoutDestruction) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     std::vector<InstWrapper> instances;
     for (uint32_t i = 0; i < 100; i++) {
@@ -171,20 +171,18 @@ TEST(NoDrivers, CreateInstance) {
 
 TEST(EnumerateInstanceLayerProperties, UsageChecks) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     const char* layer_name_1 = "TestLayer1";
     const char* layer_name_2 = "TestLayer1";
 
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name_1).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer_1.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name_1).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name_2).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer_2.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name_2).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     {  // OnePass
         VkLayerProperties layer_props[2] = {};
@@ -216,7 +214,7 @@ TEST(EnumerateInstanceLayerProperties, UsageChecks) {
 
 TEST(EnumerateInstanceExtensionProperties, UsageChecks) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     Extension first_ext{"VK_EXT_validation_features"};  // known instance extensions
     Extension second_ext{"VK_EXT_headless_surface"};
@@ -250,7 +248,7 @@ TEST(EnumerateInstanceExtensionProperties, UsageChecks) {
 
 TEST(EnumerateInstanceExtensionProperties, PropertyCountLessThanAvailable) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     uint32_t extension_count = 0;
     std::array<VkExtensionProperties, 4> extensions;
@@ -280,7 +278,7 @@ TEST(EnumerateInstanceExtensionProperties, PropertyCountLessThanAvailable) {
 
 TEST(EnumerateInstanceExtensionProperties, FilterUnkownInstanceExtensions) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     Extension first_ext{"FirstTestExtension"};  // unknown instance extensions
     Extension second_ext{"SecondTestExtension"};
@@ -308,13 +306,12 @@ TEST(EnumerateInstanceExtensionProperties, FilterUnkownInstanceExtensions) {
 
 TEST(EnumerateDeviceLayerProperties, LayersMatch) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -335,8 +332,7 @@ TEST(EnumerateDeviceLayerProperties, LayersMatch) {
 
 TEST(EnumerateDeviceExtensionProperties, DeviceExtensionEnumerated) {
     FrameworkEnvironment env{};
-    auto& test_physical_device =
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device("physical_device_0");
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device("physical_device_0");
 
     std::array<Extension, 2> device_extensions = {Extension{"MyExtension0", 4}, Extension{"MyExtension1", 7}};
     for (auto& ext : device_extensions) {
@@ -363,8 +359,7 @@ TEST(EnumerateDeviceExtensionProperties, DeviceExtensionEnumerated) {
 
 TEST(EnumerateDeviceExtensionProperties, PropertyCountLessThanAvailable) {
     FrameworkEnvironment env{};
-    auto& test_physical_device =
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device("physical_device_0");
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device("physical_device_0");
 
     std::array<Extension, 2> device_extensions = {Extension{"MyExtension0", 4}, Extension{"MyExtension1", 7}};
     for (auto& ext : device_extensions) {
@@ -392,7 +387,7 @@ TEST(EnumerateDeviceExtensionProperties, PropertyCountLessThanAvailable) {
 
 TEST(EnumerateDeviceExtensionProperties, ZeroPhysicalDeviceExtensions) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.set_api_version(VK_MAKE_API_VERSION(0, 1, 1, 0));
@@ -484,13 +479,12 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentNoExtensions) {
     std::vector<Extension> exts = {Extension{"MyDriverExtension0", 4}, Extension{"MyDriverExtension1", 7},
                                    Extension{"MyDriverExtension2", 6}, Extension{"MyDriverExtension3", 10}};
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device("physical_device_0").add_extensions(exts);
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device("physical_device_0").add_extensions(exts);
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -500,7 +494,7 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentNoExtensions) {
 
 TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithExtensions) {
     FrameworkEnvironment env{};
-    auto& test_physical_device = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device({});
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -508,12 +502,11 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithExtensions) {
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -531,7 +524,7 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithExtensions) {
 
 TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithLotsOfExtensions) {
     FrameworkEnvironment env{};
-    auto& test_physical_device = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device({});
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -539,12 +532,11 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithLotsOfExtension
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -564,7 +556,7 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithLotsOfExtension
 
 TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentWithExtensions) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -572,12 +564,11 @@ TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentW
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -590,7 +581,7 @@ TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentW
 
 TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentWithLotsOfExtensions) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -598,12 +589,11 @@ TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentW
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -616,7 +606,7 @@ TEST(EnumerateDeviceExtensionProperties, NoDriverExtensionsImplicitLayerPresentW
 
 TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithDuplicateExtensions) {
     FrameworkEnvironment env{};
-    auto& test_physical_device = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device({});
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -624,12 +614,11 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithDuplicateExtens
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -651,7 +640,7 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithDuplicateExtens
 
 TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithOnlyDuplicateExtensions) {
     FrameworkEnvironment env{};
-    auto& test_physical_device = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_and_get_physical_device({});
+    auto& test_physical_device = env.add_icd(TEST_ICD_PATH_VERSION_2).add_and_get_physical_device({});
 
     std::vector<Extension> exts;
     std::vector<ManifestLayer::LayerDescription::Extension> layer_exts;
@@ -659,12 +648,11 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithOnlyDuplicateEx
         exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
         layer_exts.emplace_back(std::string("LayerExtNumba") + std::to_string(i), i + 10);
     }
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")
-                                                         .add_device_extensions({layer_exts})),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")
+                                                             .add_device_extensions({layer_exts})));
     auto& layer = env.get_test_layer();
     layer.device_extensions = exts;
 
@@ -679,7 +667,7 @@ TEST(EnumerateDeviceExtensionProperties, ImplicitLayerPresentWithOnlyDuplicateEx
 
 TEST(EnumeratePhysicalDevices, OneCall) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     driver.add_physical_device("physical_device_0");
     driver.add_physical_device("physical_device_1");
@@ -698,7 +686,7 @@ TEST(EnumeratePhysicalDevices, OneCall) {
 
 TEST(EnumeratePhysicalDevices, TwoCall) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2)
                        .set_min_icd_interface_version(5)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
 
@@ -724,7 +712,7 @@ TEST(EnumeratePhysicalDevices, TwoCall) {
 
 TEST(EnumeratePhysicalDevices, MatchOneAndTwoCallNumbers) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2)
                        .set_min_icd_interface_version(5)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
 
@@ -760,7 +748,7 @@ TEST(EnumeratePhysicalDevices, MatchOneAndTwoCallNumbers) {
 
 TEST(EnumeratePhysicalDevices, TwoCallIncomplete) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2)
                        .set_min_icd_interface_version(5)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
 
@@ -806,7 +794,7 @@ TEST(EnumeratePhysicalDevices, TwoCallIncomplete) {
 
 TEST(EnumeratePhysicalDevices, ZeroPhysicalDevices) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.set_api_version(VK_MAKE_API_VERSION(0, 1, 1, 0));
     inst.CheckCreate();
@@ -818,7 +806,8 @@ TEST(EnumeratePhysicalDevices, ZeroPhysicalDevices) {
 
 TEST(EnumeratePhysicalDevices, ZeroPhysicalDevicesAfterCreateInstance) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
+                       .set_min_icd_interface_version(5);
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.set_api_version(VK_API_VERSION_1_1);
     inst.CheckCreate();
@@ -840,7 +829,7 @@ TEST(EnumeratePhysicalDevices, ZeroPhysicalDevicesAfterCreateInstance) {
 
 TEST(EnumeratePhysicalDevices, CallTwiceNormal) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     for (size_t i = 0; i < 4; i++) {
         driver.add_and_get_physical_device(std::string("physical_device_") + std::to_string(i));
@@ -866,7 +855,7 @@ TEST(EnumeratePhysicalDevices, CallTwiceNormal) {
 
 TEST(EnumeratePhysicalDevices, CallTwiceIncompleteOnceNormal) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     for (size_t i = 0; i < 8; i++) {
         driver.add_and_get_physical_device(std::string("physical_device_") + std::to_string(i));
@@ -902,7 +891,7 @@ TEST(EnumeratePhysicalDevices, CallTwiceIncompleteOnceNormal) {
 
 TEST(EnumeratePhysicalDevices, CallThriceSuccessReduce) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     for (size_t i = 0; i < 8; i++) {
         driver.add_and_get_physical_device(std::string("physical_device_") + std::to_string(i));
@@ -938,7 +927,7 @@ TEST(EnumeratePhysicalDevices, CallThriceSuccessReduce) {
 
 TEST(EnumeratePhysicalDevices, CallThriceAddInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     driver.add_physical_device("physical_device_0");
     driver.add_physical_device("physical_device_1");
@@ -977,7 +966,7 @@ TEST(EnumeratePhysicalDevices, CallThriceAddInBetween) {
 
 TEST(EnumeratePhysicalDevices, CallThriceRemoveInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     for (size_t i = 0; i < 4; i++) {
         driver.add_physical_device(std::string("physical_device_") + std::to_string(i));
@@ -1033,7 +1022,7 @@ TEST(EnumeratePhysicalDevices, CallThriceRemoveInBetween) {
 
 TEST(EnumeratePhysicalDevices, MultipleAddRemoves) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
     auto phys_dev_handle_0 = driver.add_and_get_physical_device("physical_device_0").vk_physical_device.handle;
     auto phys_dev_handle_1 = driver.add_and_get_physical_device("physical_device_1").vk_physical_device.handle;
     auto phys_dev_handle_2 = driver.add_and_get_physical_device("physical_device_2").vk_physical_device.handle;
@@ -1165,7 +1154,7 @@ TEST(EnumeratePhysicalDevices, MultipleAddRemoves) {
 
 TEST(EnumeratePhysicalDevices, OneDriverWithWrongErrorCodes) {
     FrameworkEnvironment env;
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.set_api_version(VK_API_VERSION_1_1);
@@ -1196,8 +1185,8 @@ TEST(EnumeratePhysicalDevices, OneDriverWithWrongErrorCodes) {
 
 TEST(EnumeratePhysicalDevices, TwoDriversOneWithWrongErrorCodes) {
     FrameworkEnvironment env;
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
-    TestICD& icd1 = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
+    TestICD& icd1 = env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.set_api_version(VK_API_VERSION_1_1);
@@ -1225,7 +1214,7 @@ TEST(EnumeratePhysicalDevices, TwoDriversOneWithWrongErrorCodes) {
 
 TEST(EnumeratePhysicalDevices, DeviceFiltering) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).set_min_icd_interface_version(5);
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2).set_min_icd_interface_version(5);
 
     for (uint32_t i = 0; i < 10; i++) {
         auto& physical_device = driver.add_and_get_physical_device("physical_device_" + std::to_string(i));
@@ -1344,7 +1333,7 @@ TEST(EnumeratePhysicalDevices, DeviceFiltering) {
 
 TEST(EnumeratePhysicalDevices, DeviceFilteringByDriverId) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -1432,7 +1421,7 @@ TEST(EnumeratePhysicalDevices, DeviceFilteringByDriverId) {
 
 TEST(CreateDevice, ExtensionNotPresent) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -1450,7 +1439,7 @@ TEST(CreateDevice, ExtensionNotPresent) {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#extendingvulkan-layers-devicelayerdeprecation
 TEST(CreateDevice, LayersNotPresent) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -1468,13 +1457,12 @@ TEST(CreateDevice, LayersNotPresent) {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#extendingvulkan-layers-devicelayerdeprecation
 TEST(CreateDevice, MatchInstanceAndDeviceLayers) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -1494,13 +1482,12 @@ TEST(CreateDevice, MatchInstanceAndDeviceLayers) {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#extendingvulkan-layers-devicelayerdeprecation
 TEST(CreateDevice, UnmatchInstanceAndDeviceLayers) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     DebugUtilsLogger debug_log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT};
     InstWrapper inst{env.vulkan_functions};
@@ -1528,13 +1515,12 @@ TEST(CreateDevice, UnmatchInstanceAndDeviceLayers) {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#extendingvulkan-layers-devicelayerdeprecation
 TEST(CreateDevice, CheckCopyOfInstanceLayerNames) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     {
@@ -1555,7 +1541,7 @@ TEST(CreateDevice, CheckCopyOfInstanceLayerNames) {
 
 TEST(CreateDevice, ConsecutiveCreate) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     for (uint32_t i = 0; i < 100; i++) {
         driver.add_physical_device("physical_device_0");
@@ -1572,7 +1558,7 @@ TEST(CreateDevice, ConsecutiveCreate) {
 
 TEST(CreateDevice, ConsecutiveCreateWithoutDestruction) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     for (uint32_t i = 0; i < 100; i++) {
         driver.add_physical_device("physical_device_0");
@@ -1593,8 +1579,8 @@ TEST(CreateDevice, ConsecutiveCreateWithoutDestruction) {
 
 TEST(TryLoadWrongBinaries, WrongICD) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
-    env.add_icd(TestICDDetails(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE).set_is_fake(true));
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
+    env.add_icd(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE, ManifestOptions{}.set_is_fake(true));
 
     DebugUtilsLogger log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT};
     InstWrapper inst{env.vulkan_functions};
@@ -1619,13 +1605,13 @@ TEST(TryLoadWrongBinaries, WrongICD) {
 
 TEST(TryLoadWrongBinaries, WrongExplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "DummyLayerExplicit";
-    env.add_fake_explicit_layer(
+    env.add_explicit_layer(
+        ManifestOptions{}.set_is_fake(true),
         ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)),
-        "dummy_test_layer.json");
+            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)));
 
     auto layer_props = env.GetLayerProperties(1);
     ASSERT_TRUE(string_eq(layer_name, layer_props[0].layerName));
@@ -1642,21 +1628,21 @@ TEST(TryLoadWrongBinaries, WrongExplicit) {
 #if !defined(__APPLE__)
     ASSERT_TRUE(log.find(std::string("Requested layer \"") + std::string(layer_name) + std::string("\" was wrong bit-type!")));
 #else   // __APPLE__
-    // Apple only throws a wrong library type of error
+        // Apple only throws a wrong library type of error
     ASSERT_TRUE(log.find(std::string("Requested layer \"") + std::string(layer_name) + std::string("\" failed to load!")));
 #endif  // __APPLE__
 }
 
 TEST(TryLoadWrongBinaries, WrongImplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "DummyLayerImplicit0";
-    env.add_fake_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                              .set_name(layer_name)
-                                                              .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
-                                                              .set_disable_environment("DISABLE_ENV")),
-                                "dummy_test_layer.json");
+    env.add_implicit_layer(ManifestOptions{}.set_is_fake(true),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name)
+                                                         .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
+                                                         .set_disable_environment("DISABLE_ENV")));
 
     auto layer_props = env.GetLayerProperties(1);
     ASSERT_TRUE(string_eq(layer_name, layer_props[0].layerName));
@@ -1680,19 +1666,20 @@ TEST(TryLoadWrongBinaries, WrongImplicit) {
 
 TEST(TryLoadWrongBinaries, WrongExplicitAndImplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name_0 = "DummyLayerExplicit";
-    env.add_fake_explicit_layer(
+    env.add_explicit_layer(
+        ManifestOptions{}.set_is_fake(true),
         ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)),
-        "dummy_test_layer_0.json");
+            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)));
+
     const char* layer_name_1 = "DummyLayerImplicit";
-    env.add_fake_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                              .set_name(layer_name_1)
-                                                              .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
-                                                              .set_disable_environment("DISABLE_ENV")),
-                                "dummy_test_layer_1.json");
+    env.add_implicit_layer(ManifestOptions{}.set_is_fake(true),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name_1)
+                                                         .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
+                                                         .set_disable_environment("DISABLE_ENV")));
 
     auto layer_props = env.GetLayerProperties(2);
     ASSERT_TRUE(check_permutation({layer_name_0, layer_name_1}, layer_props));
@@ -1719,19 +1706,20 @@ TEST(TryLoadWrongBinaries, WrongExplicitAndImplicit) {
 
 TEST(TryLoadWrongBinaries, WrongExplicitAndImplicitErrorOnly) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name_0 = "DummyLayerExplicit";
-    env.add_fake_explicit_layer(
+    env.add_explicit_layer(
+        ManifestOptions{}.set_is_fake(true),
         ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)),
-        "dummy_test_layer_0.json");
+            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)));
+
     const char* layer_name_1 = "DummyLayerImplicit";
-    env.add_fake_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                              .set_name(layer_name_1)
-                                                              .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
-                                                              .set_disable_environment("DISABLE_ENV")),
-                                "dummy_test_layer_1.json");
+    env.add_implicit_layer(ManifestOptions{}.set_is_fake(true),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name_1)
+                                                         .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE)
+                                                         .set_disable_environment("DISABLE_ENV")));
 
     auto layer_props = env.GetLayerProperties(2);
     ASSERT_TRUE(check_permutation({layer_name_0, layer_name_1}, layer_props));
@@ -1757,13 +1745,13 @@ TEST(TryLoadWrongBinaries, WrongExplicitAndImplicitErrorOnly) {
 
 TEST(TryLoadWrongBinaries, BadExplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "DummyLayerExplicit";
-    env.add_fake_explicit_layer(
+    env.add_explicit_layer(
+        ManifestOptions{}.set_is_fake(true),
         ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)),
-        "dummy_test_layer.json");
+            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)));
 
     auto layer_props = env.GetLayerProperties(1);
     ASSERT_TRUE(string_eq(layer_name, layer_props[0].layerName));
@@ -1786,14 +1774,14 @@ TEST(TryLoadWrongBinaries, BadExplicit) {
 
 TEST(TryLoadWrongBinaries, BadImplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "DummyLayerImplicit0";
-    env.add_fake_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                              .set_name(layer_name)
-                                                              .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)
-                                                              .set_disable_environment("DISABLE_ENV")),
-                                "dummy_test_layer.json");
+    env.add_implicit_layer(ManifestOptions{}.set_is_fake(true),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name)
+                                                         .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)
+                                                         .set_disable_environment("DISABLE_ENV")));
 
     auto layer_props = env.GetLayerProperties(1);
     ASSERT_TRUE(string_eq(layer_name, layer_props[0].layerName));
@@ -1816,19 +1804,20 @@ TEST(TryLoadWrongBinaries, BadImplicit) {
 
 TEST(TryLoadWrongBinaries, BadExplicitAndImplicit) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name_0 = "DummyLayerExplicit";
-    env.add_fake_explicit_layer(
+    env.add_explicit_layer(
+        ManifestOptions{}.set_is_fake(true),
         ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)),
-        "dummy_test_layer_0.json");
+            ManifestLayer::LayerDescription{}.set_name(layer_name_0).set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)));
+
     const char* layer_name_1 = "DummyLayerImplicit0";
-    env.add_fake_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                              .set_name(layer_name_1)
-                                                              .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)
-                                                              .set_disable_environment("DISABLE_ENV")),
-                                "dummy_test_layer_1.json");
+    env.add_implicit_layer(ManifestOptions{}.set_is_fake(true),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name_1)
+                                                         .set_lib_path(CURRENT_PLATFORM_DUMMY_BINARY_BAD)
+                                                         .set_disable_environment("DISABLE_ENV")));
 
     auto layer_props = env.GetLayerProperties(2);
     ASSERT_TRUE(check_permutation({layer_name_0, layer_name_1}, layer_props));
@@ -1852,7 +1841,7 @@ TEST(TryLoadWrongBinaries, BadExplicitAndImplicit) {
 TEST(TryLoadWrongBinaries, WrongArchDriver) {
     FrameworkEnvironment env{};
     // Intentionally set the wrong arch
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}.icd_manifest.set_library_arch(sizeof(void*) == 4 ? "64" : "32"))
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_library_arch(sizeof(void*) == 4 ? "64" : "32"))
         .add_physical_device("physical_device_0");
 
     DebugUtilsLogger log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT};
@@ -1866,15 +1855,14 @@ TEST(TryLoadWrongBinaries, WrongArchDriver) {
 
 TEST(TryLoadWrongBinaries, WrongArchLayer) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     const char* layer_name = "TestLayer";
-    env.add_explicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         // Intentionally set the wrong arch
-                                                         .set_library_arch(sizeof(void*) == 4 ? "64" : "32")),
-                           "test_layer.json");
+    env.add_explicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             // Intentionally set the wrong arch
+                                                             .set_library_arch(sizeof(void*) == 4 ? "64" : "32")));
 
     DebugUtilsLogger log{VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT};
     InstWrapper inst{env.vulkan_functions};
@@ -1887,7 +1875,7 @@ TEST(TryLoadWrongBinaries, WrongArchLayer) {
 
 TEST(EnumeratePhysicalDeviceGroups, OneCall) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -2023,7 +2011,7 @@ TEST(EnumeratePhysicalDeviceGroups, OneCall) {
 
 TEST(EnumeratePhysicalDeviceGroups, TwoCall) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -2142,7 +2130,7 @@ TEST(EnumeratePhysicalDeviceGroups, TwoCall) {
 
 TEST(EnumeratePhysicalDeviceGroups, TwoCallIncomplete) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -2244,7 +2232,7 @@ TEST(EnumeratePhysicalDeviceGroups, TwoCallIncomplete) {
 // vkEnumeratePhysicalDeviceGroupsKHR, and make sure they return the same info.
 TEST(EnumeratePhysicalDeviceGroups, TestCoreVersusExtensionSameReturns) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME})
@@ -2334,7 +2322,7 @@ TEST(EnumeratePhysicalDeviceGroups, TestCoreVersusExtensionSameReturns) {
 // querying vkEnumeratePhysicalDeviceGroups before and after the add.
 TEST(EnumeratePhysicalDeviceGroups, CallThriceAddGroupInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1);
 
@@ -2429,7 +2417,7 @@ TEST(EnumeratePhysicalDeviceGroups, CallThriceAddGroupInBetween) {
 // querying vkEnumeratePhysicalDeviceGroups before and after the remove.
 TEST(EnumeratePhysicalDeviceGroups, CallTwiceRemoveGroupInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1);
 
@@ -2516,7 +2504,7 @@ TEST(EnumeratePhysicalDeviceGroups, CallTwiceRemoveGroupInBetween) {
 // querying vkEnumeratePhysicalDeviceGroups before and after the add.
 TEST(EnumeratePhysicalDeviceGroups, CallTwiceAddDeviceInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1);
 
@@ -2602,7 +2590,7 @@ TEST(EnumeratePhysicalDeviceGroups, CallTwiceAddDeviceInBetween) {
 // querying vkEnumeratePhysicalDeviceGroups before and after the remove.
 TEST(EnumeratePhysicalDeviceGroups, CallTwiceRemoveDeviceInBetween) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1);
 
@@ -2699,7 +2687,7 @@ TEST(EnumeratePhysicalDeviceGroups, CallTwiceRemoveDeviceInBetween) {
 // various devices and groups while querying in between.
 TEST(EnumeratePhysicalDeviceGroups, MultipleAddRemoves) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1);
 
@@ -2839,7 +2827,7 @@ TEST(EnumeratePhysicalDeviceGroups, FakePNext) {
     //   PhysDev 6: pd6, Discrete, Vulkan 1.1, Bus 2
     //   Group 0: PhysDev 5, PhysDev 6
     //   Group 1: PhysDev 4
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_0 = env.get_test_icd(0);
     cur_icd_0.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_0 = cur_icd_0.add_and_get_physical_device({"pd0"});
@@ -2858,7 +2846,7 @@ TEST(EnumeratePhysicalDeviceGroups, FakePNext) {
     cur_icd_0.physical_device_groups.back().use_physical_device(test_physical_device_0).use_physical_device(test_physical_device_2);
     cur_icd_0.physical_device_groups.push_back({test_physical_device_1});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_1 = env.get_test_icd(1);
     cur_icd_1.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_4 = cur_icd_1.add_and_get_physical_device({"pd4"});
@@ -2915,7 +2903,7 @@ TEST(EnumeratePhysicalDeviceGroups, FakePNext) {
 
 TEST(EnumeratePhysicalDeviceGroups, DeviceFiltering) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -3066,7 +3054,7 @@ TEST(EnumeratePhysicalDeviceGroups, DeviceFiltering) {
 
 TEST(EnumeratePhysicalDeviceGroups, DeviceFilteringByDriverId) {
     FrameworkEnvironment env{};
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1))
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1))
                        .set_min_icd_interface_version(5)
                        .set_icd_api_version(VK_API_VERSION_1_1)
                        .add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
@@ -3183,7 +3171,7 @@ TEST(ExtensionManual, ToolingProperties) {
                                                      "No-Layer"};
     {  // No support in driver
         FrameworkEnvironment env{};
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA)).add_physical_device({});
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).add_physical_device({});
 
         InstWrapper inst{env.vulkan_functions};
         inst.CheckCreate();
@@ -3199,7 +3187,7 @@ TEST(ExtensionManual, ToolingProperties) {
     }
     {  // extension is supported in driver
         FrameworkEnvironment env{};
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA))
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA)
             .set_supports_tooling_info_ext(true)
             .add_tooling_property(icd_tool_props)
             .add_physical_device(PhysicalDevice{}.add_extension(VK_EXT_TOOLING_INFO_EXTENSION_NAME).finish());
@@ -3221,7 +3209,7 @@ TEST(ExtensionManual, ToolingProperties) {
     }
     {  // core
         FrameworkEnvironment env{};
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, VK_API_VERSION_1_3))
+        env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_3))
             .set_supports_tooling_info_core(true)
             .add_tooling_property(icd_tool_props)
             .add_and_get_physical_device({})
@@ -3245,7 +3233,7 @@ TEST(ExtensionManual, ToolingProperties) {
 }
 TEST(CreateInstance, InstanceNullLayerPtr) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     VkInstance inst = VK_NULL_HANDLE;
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -3255,7 +3243,7 @@ TEST(CreateInstance, InstanceNullLayerPtr) {
 }
 TEST(CreateInstance, InstanceNullExtensionPtr) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     VkInstance inst = VK_NULL_HANDLE;
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -3268,7 +3256,7 @@ TEST(CreateInstance, InstanceNullExtensionPtr) {
 // NOTE: Sort order only affects Linux
 TEST(SortedPhysicalDevices, DevicesSortEnabled10NoAppExt) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({"pd0"});
     test_physical_device_0.set_pci_bus(7);
@@ -3281,14 +3269,14 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10NoAppExt) {
                             0xAAA002);
     test_physical_device_1.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(1).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_2 = env.get_test_icd(1).add_and_get_physical_device({"pd2"});
     test_physical_device_2.set_pci_bus(0);
     FillInRandomDeviceProps(test_physical_device_2.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_0, 1, 0xBBBB001);
     test_physical_device_2.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(2).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_3 = env.get_test_icd(2).add_and_get_physical_device({"pd3"});
     test_physical_device_3.set_pci_bus(1);
@@ -3301,7 +3289,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10NoAppExt) {
                             0xCCCC002);
     test_physical_device_4.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(3).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_5 = env.get_test_icd(3).add_and_get_physical_device({"pd5"});
     test_physical_device_5.set_pci_bus(0);
@@ -3375,7 +3363,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10NoAppExt) {
 
 TEST(SortedPhysicalDevices, DevicesSortEnabled10AppExt) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({"pd0"});
     test_physical_device_0.set_pci_bus(7);
@@ -3388,14 +3376,14 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10AppExt) {
                             0xAAA002);
     test_physical_device_1.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(1).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_2 = env.get_test_icd(1).add_and_get_physical_device({"pd2"});
     test_physical_device_2.set_pci_bus(0);
     FillInRandomDeviceProps(test_physical_device_2.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_0, 1, 0xBBBB001);
     test_physical_device_2.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(2).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_3 = env.get_test_icd(2).add_and_get_physical_device({"pd3"});
     test_physical_device_3.set_pci_bus(1);
@@ -3408,7 +3396,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10AppExt) {
                             0xCCCC002);
     test_physical_device_4.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(3).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_5 = env.get_test_icd(3).add_and_get_physical_device({"pd5"});
     test_physical_device_5.set_pci_bus(0);
@@ -3496,7 +3484,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled10AppExt) {
 
 TEST(SortedPhysicalDevices, DevicesSortEnabled11) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(0).set_icd_api_version(VK_API_VERSION_1_1);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({"pd0"});
@@ -3510,7 +3498,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled11) {
                             0xAAA002);
     test_physical_device_1.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(1).set_icd_api_version(VK_API_VERSION_1_1);
     env.get_test_icd(1).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_2 = env.get_test_icd(1).add_and_get_physical_device({"pd2"});
@@ -3518,7 +3506,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled11) {
     FillInRandomDeviceProps(test_physical_device_2.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_0, 1, 0xBBBB001);
     test_physical_device_2.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(2).set_icd_api_version(VK_API_VERSION_1_1);
     env.get_test_icd(2).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_3 = env.get_test_icd(2).add_and_get_physical_device({"pd3"});
@@ -3532,7 +3520,7 @@ TEST(SortedPhysicalDevices, DevicesSortEnabled11) {
                             0xCCCC002);
     test_physical_device_4.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     env.get_test_icd(3).set_icd_api_version(VK_API_VERSION_1_1);
     env.get_test_icd(3).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_5 = env.get_test_icd(3).add_and_get_physical_device({"pd5"});
@@ -3624,7 +3612,7 @@ TEST(SortedPhysicalDevices, DevicesSortedDisabled) {
 
     EnvVarWrapper disable_select_env_var{"VK_LOADER_DISABLE_SELECT", "1"};
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(0).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({"pd0"});
     FillInRandomDeviceProps(test_physical_device_0.properties, VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_API_VERSION_1_0, 888,
@@ -3635,13 +3623,13 @@ TEST(SortedPhysicalDevices, DevicesSortedDisabled) {
                             0xAAA002);
     test_physical_device_1.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(1).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_2 = env.get_test_icd(1).add_and_get_physical_device({"pd2"});
     FillInRandomDeviceProps(test_physical_device_2.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_0, 1, 0xBBBB001);
     test_physical_device_2.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(2).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_3 = env.get_test_icd(2).add_and_get_physical_device({"pd3"});
     FillInRandomDeviceProps(test_physical_device_3.properties, VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_API_VERSION_1_0, 75,
@@ -3652,7 +3640,7 @@ TEST(SortedPhysicalDevices, DevicesSortedDisabled) {
                             0xCCCC002);
     test_physical_device_4.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_0));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
     env.get_test_icd(3).add_instance_extension({VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME});
     auto& test_physical_device_5 = env.get_test_icd(3).add_and_get_physical_device({"pd5"});
     FillInRandomDeviceProps(test_physical_device_5.properties, VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU, VK_API_VERSION_1_0, 6940,
@@ -3724,7 +3712,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedEnabled) {
     //   Group 1: PhysDev 4
     // ICD 3: Vulkan 1.1
     //   PhysDev 7: pd7, Virtual, Vulkan 1.1, Bus 0
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_0 = env.get_test_icd(0);
     cur_icd_0.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_0 = cur_icd_0.add_and_get_physical_device({"pd0"});
@@ -3746,7 +3734,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedEnabled) {
     cur_icd_0.physical_device_groups.back().use_physical_device(test_physical_device_0).use_physical_device(test_physical_device_2);
     cur_icd_0.physical_device_groups.push_back({test_physical_device_1});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_1 = env.get_test_icd(1);
     cur_icd_1.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_3 = cur_icd_1.add_and_get_physical_device({"pd3"});
@@ -3754,7 +3742,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedEnabled) {
     test_physical_device_3.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
     FillInRandomDeviceProps(test_physical_device_3.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_1, 1, 0xBBBB001);
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_2 = env.get_test_icd(2);
     cur_icd_2.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_4 = cur_icd_2.add_and_get_physical_device({"pd4"});
@@ -3776,7 +3764,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedEnabled) {
     cur_icd_2.physical_device_groups.back().use_physical_device(test_physical_device_5).use_physical_device(test_physical_device_6);
     cur_icd_2.physical_device_groups.push_back({test_physical_device_4});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_3 = env.get_test_icd(3);
     cur_icd_3.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_7 = cur_icd_3.add_and_get_physical_device({"pd7"});
@@ -3912,7 +3900,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedDisabled) {
     //   Group 1: PhysDev 4
     // ICD 3: Vulkan 1.1
     //   PhysDev 7: pd7, Virtual, Vulkan 1.1, Bus 0
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_0 = env.get_test_icd(0);
     cur_icd_0.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_0 = cur_icd_0.add_and_get_physical_device({"pd0"});
@@ -3931,14 +3919,14 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedDisabled) {
     cur_icd_0.physical_device_groups.back().use_physical_device(test_physical_device_0).use_physical_device(test_physical_device_2);
     cur_icd_0.physical_device_groups.push_back({test_physical_device_1});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_1 = env.get_test_icd(1);
     cur_icd_1.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_3 = cur_icd_1.add_and_get_physical_device({"pd3"});
     test_physical_device_3.extensions.push_back({VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, 0});
     FillInRandomDeviceProps(test_physical_device_3.properties, VK_PHYSICAL_DEVICE_TYPE_CPU, VK_API_VERSION_1_1, 1, 0xBBBB001);
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_2 = env.get_test_icd(2);
     cur_icd_2.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_4 = cur_icd_2.add_and_get_physical_device({"pd4"});
@@ -3957,7 +3945,7 @@ TEST(SortedPhysicalDevices, DeviceGroupsSortedDisabled) {
     cur_icd_2.physical_device_groups.back().use_physical_device(test_physical_device_5).use_physical_device(test_physical_device_6);
     cur_icd_2.physical_device_groups.push_back({test_physical_device_4});
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2, VK_API_VERSION_1_1));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_1));
     auto& cur_icd_3 = env.get_test_icd(3);
     cur_icd_3.set_icd_api_version(VK_API_VERSION_1_1);
     auto& test_physical_device_7 = cur_icd_3.add_and_get_physical_device({"pd7"});
@@ -4057,8 +4045,7 @@ const char* portability_extension_missing =
 
 TEST(PortabilityICDConfiguration, PortabilityICDOnly) {
     FrameworkEnvironment env{};
-    env.add_icd(
-           TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_is_portability_driver(true)))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_is_portability_driver(true))
         .add_physical_device("physical_device_0")
         .set_max_icd_interface_version(1);
     {  // enable portability extension and flag
@@ -4110,9 +4097,8 @@ TEST(PortabilityICDConfiguration, PortabilityICDOnly) {
 
 TEST(PortabilityICDConfiguration, PortabilityAndRegularICD) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA)));
-    env.add_icd(
-        TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_is_portability_driver(true)));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_is_portability_driver(true));
 
     auto& driver0 = env.get_test_icd(0);
     auto& driver1 = env.get_test_icd(1);
@@ -4192,8 +4178,8 @@ TEST(PortabilityICDConfiguration, PortabilityAndRegularICD) {
 // Check that the portability enumeration flag bit doesn't get passed down
 TEST(PortabilityICDConfiguration, PortabilityAndRegularICDCheckFlagsPassedIntoICD) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2)));
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2).set_is_portability_driver(true)));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
+    env.add_icd(TEST_ICD_PATH_VERSION_2, {}, ManifestICD{}.set_is_portability_driver(true));
 
     auto& driver0 = env.get_test_icd(0);
     auto& driver1 = env.get_test_icd(1);
@@ -4223,12 +4209,11 @@ TEST(PortabilityICDConfiguration, PortabilityAndRegularICDPreInstanceFunctions) 
     FrameworkEnvironment env{};
     Extension first_ext{"VK_EXT_validation_features"};  // known instance extensions
     Extension second_ext{"VK_EXT_headless_surface"};
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA)))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA)
         .add_physical_device("physical_device_0")
         .set_max_icd_interface_version(1)
         .add_instance_extensions({first_ext, second_ext});
-    env.add_icd(
-           TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_is_portability_driver(true)))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_is_portability_driver(true))
         .add_physical_device("portability_physical_device_1")
         .set_max_icd_interface_version(1);
     {
@@ -4244,9 +4229,8 @@ TEST(PortabilityICDConfiguration, PortabilityAndRegularICDPreInstanceFunctions) 
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -4268,7 +4252,7 @@ TEST(PortabilityICDConfiguration, PortabilityAndRegularICDPreInstanceFunctions) 
 #if defined(_WIN32)
 TEST(AppPackageDiscovery, AppPackageDrivers) {
     FrameworkEnvironment env;
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}.set_discovery_type(ManifestDiscoveryType::windows_app_package))
+    env.add_icd(TEST_ICD_PATH_VERSION_2, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::windows_app_package))
         .add_physical_device({});
 
     InstWrapper inst{env.vulkan_functions};
@@ -4276,15 +4260,14 @@ TEST(AppPackageDiscovery, AppPackageDrivers) {
 }
 TEST(AppPackageDiscovery, AppPackageLayers) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2))).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     const char* layer_name = "VK_LAYER_test_package_layer";
-    env.add_implicit_layer(TestLayerDetails(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                                          .set_name(layer_name)
-                                                                          .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                                          .set_disable_environment("DISABLE_ME")),
-                                            "test_package_layer.json")
-                               .set_discovery_type(ManifestDiscoveryType::windows_app_package));
+    env.add_implicit_layer(ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::windows_app_package),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name)
+                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                         .set_disable_environment("DISABLE_ME")));
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -4296,16 +4279,15 @@ TEST(AppPackageDiscovery, AppPackageLayers) {
 
 TEST(AppPackageDiscovery, AppPackageICDAndLayers) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}.set_discovery_type(ManifestDiscoveryType::windows_app_package))
+    env.add_icd(TEST_ICD_PATH_VERSION_2, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::windows_app_package))
         .add_physical_device({});
 
     const char* layer_name = "VK_LAYER_test_package_layer";
-    env.add_implicit_layer(TestLayerDetails(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                                          .set_name(layer_name)
-                                                                          .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                                          .set_disable_environment("DISABLE_ME")),
-                                            "test_package_layer.json")
-                               .set_discovery_type(ManifestDiscoveryType::windows_app_package));
+    env.add_implicit_layer(ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::windows_app_package),
+                           ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                         .set_name(layer_name)
+                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                         .set_disable_environment("DISABLE_ME")));
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -4320,7 +4302,7 @@ TEST(AppPackageDiscovery, AppPackageICDAndLayers) {
 // when the corresponding manifest is removed from the file system.
 TEST(DuplicateRegistryEntries, Layers) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(ManifestICD{}.set_lib_path(TEST_ICD_PATH_VERSION_2)));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     auto null_path = env.get_folder(ManifestLocation::null).location() / "test_layer.json";
 
@@ -4328,9 +4310,8 @@ TEST(DuplicateRegistryEntries, Layers) {
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        ManifestLayer{}.add_layer(
-            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-        "test_layer.json");
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     InstWrapper inst{env.vulkan_functions};
     inst.create_info.add_layer(layer_name);
@@ -4344,7 +4325,7 @@ TEST(DuplicateRegistryEntries, Drivers) {
     auto null_path = env.get_folder(ManifestLocation::null).location() / "test_icd_0.json";
     env.platform_shim->add_manifest_to_registry(ManifestCategory::icd, null_path);
 
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA}.set_discovery_type(ManifestDiscoveryType::null_dir))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::null_dir))
         .add_physical_device("physical_device_0")
         .set_adapterLUID(_LUID{10, 1000});
     env.platform_shim->add_d3dkmt_adapter(D3DKMT_Adapter{0, _LUID{10, 1000}}.add_driver_manifest_path(env.get_icd_manifest_path()));
@@ -4362,17 +4343,16 @@ TEST(LibraryLoading, SystemLocations) {
     FrameworkEnvironment env{};
 
     auto& test_physical_device =
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2).set_library_path_type(LibraryPathType::default_search_paths))
+        env.add_icd(TEST_ICD_PATH_VERSION_2, ManifestOptions{}.set_library_path_type(LibraryPathType::default_search_paths))
             .add_and_get_physical_device({});
     const char* fake_ext_name = "VK_FAKE_extension";
     test_physical_device.add_extension(fake_ext_name);
 
     const char* layer_name = "TestLayer";
     env.add_explicit_layer(
-        TestLayerDetails{ManifestLayer{}.add_layer(
-                             ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)),
-                         "test_layer.json"}
-            .set_library_path_type(LibraryPathType::default_search_paths));
+        ManifestOptions{}.set_library_path_type(LibraryPathType::default_search_paths),
+        ManifestLayer{}.add_layer(
+            ManifestLayer::LayerDescription{}.set_name(layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
 
     auto props = env.GetLayerProperties(1);
     ASSERT_TRUE(string_eq(props.at(0).layerName, layer_name));
@@ -4395,7 +4375,8 @@ TEST(LibraryLoading, SystemLocations) {
 // Check that valid symlinks do not cause the loader to crash when found in an unsecure location
 TEST(ManifestDiscovery, ValidSymlinkInUnsecureLocation) {
     FrameworkEnvironment env;
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_discovery_type(ManifestDiscoveryType::override_folder))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA,
+                ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::override_folder))
         .add_physical_device({});
 
     env.add_symlink(ManifestLocation::unsecured_driver, env.get_icd_manifest_path(0), "symlink_to_driver.json");
@@ -4408,7 +4389,8 @@ TEST(ManifestDiscovery, ValidSymlinkInUnsecureLocation) {
 // Check that valid symlinks do not cause the loader to crash
 TEST(ManifestDiscovery, ValidSymlink) {
     FrameworkEnvironment env{FrameworkSettings{}};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_discovery_type(ManifestDiscoveryType::override_folder))
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA,
+                ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::override_folder))
         .add_physical_device({});
 
     env.add_symlink(ManifestLocation::driver, env.get_icd_manifest_path(0), "symlink_to_driver.json");
@@ -4448,10 +4430,11 @@ TEST(ManifestDiscovery, InvalidSymlink) {
 TEST(ManifestDiscovery, AppleBundles) {
     FrameworkEnvironment env{};
     env.setup_macos_bundle();
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_discovery_type(ManifestDiscoveryType::macos_bundle));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA,
+                ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::macos_bundle));
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device_0.properties.deviceID = 1337;
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
     auto& test_physical_device_1 = env.get_test_icd(1).add_and_get_physical_device({});
     test_physical_device_1.properties.deviceID = 9999;
 
@@ -4472,12 +4455,13 @@ TEST(ManifestDiscovery, AppleBundles) {
 TEST(ManifestDiscovery, AppleBundlesEnvVarActive) {
     FrameworkEnvironment env{};
     env.setup_macos_bundle();
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_discovery_type(ManifestDiscoveryType::macos_bundle));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA,
+                ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::macos_bundle));
 
     auto& test_physical_device_0 = env.get_test_icd(0).add_and_get_physical_device({});
     test_physical_device_0.properties.deviceID = 1337;
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).set_discovery_type(ManifestDiscoveryType::env_var));
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::env_var));
     auto& test_physical_device_1 = env.get_test_icd(1).add_and_get_physical_device({});
     test_physical_device_1.properties.deviceID = 9999;
 
@@ -4495,21 +4479,19 @@ TEST(ManifestDiscovery, AppleBundlesEnvVarActive) {
 
 TEST(LayerCreatesDevice, Basic) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
     env.get_test_layer().set_call_create_device_while_create_device_is_called(true);
     env.get_test_layer().set_physical_device_index_to_use_during_create_device(0);
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name2")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer2.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name2")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -4520,24 +4502,20 @@ TEST(LayerCreatesDevice, Basic) {
 
 TEST(LayerCreatesDevice, DifferentPhysicalDevice) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
-    env.get_test_icd(0).add_and_get_physical_device("Device0");
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
-    env.get_test_icd(1).add_and_get_physical_device("Device1");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("Device0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("Device1");
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
     env.get_test_layer().set_call_create_device_while_create_device_is_called(true);
     env.get_test_layer().set_physical_device_index_to_use_during_create_device(1);
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name2")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer2.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name2")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
 
     InstWrapper inst{env.vulkan_functions};
     inst.CheckCreate();
@@ -4550,13 +4528,12 @@ TEST(LayerCreatesDevice, DifferentPhysicalDevice) {
 
 TEST(Layer, pfnNextGetInstanceProcAddr_should_not_return_layers_own_functions) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
     env.get_test_layer(0).set_check_if_EnumDevExtProps_is_same_as_queried_function(true);
 
     InstWrapper inst{env.vulkan_functions};
@@ -4570,13 +4547,12 @@ TEST(Layer, pfnNextGetInstanceProcAddr_should_not_return_layers_own_functions) {
 
 TEST(Layer, LLP_LAYER_21) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
     env.get_test_layer(0).set_clobber_pInstance(true);
 
     InstWrapper inst{env.vulkan_functions};
@@ -4606,13 +4582,12 @@ TEST(Layer, LLP_LAYER_21) {
 
 TEST(Layer, LLP_LAYER_22) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name("implicit_layer_name")
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ME")),
-                           "implicit_test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("implicit_layer_name")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
     env.get_test_layer(0).set_clobber_pDevice(true);
 
     InstWrapper inst{env.vulkan_functions};
@@ -4648,7 +4623,7 @@ TEST(Layer, LLP_LAYER_22) {
 
 TEST(InvalidManifest, ICD) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     std::vector<std::string> invalid_jsons;
     invalid_jsons.push_back(",");
@@ -4674,7 +4649,7 @@ TEST(InvalidManifest, ICD) {
 
 TEST(InvalidManifest, Layer) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device({});
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
 
     std::vector<std::string> invalid_jsons;
     invalid_jsons.push_back(",");
@@ -4700,7 +4675,7 @@ TEST(InvalidManifest, Layer) {
 }
 #if defined(WIN32)
 VkPhysicalDevice add_dxgi_adapter(FrameworkEnvironment& env, std::filesystem::path const& name, LUID luid, uint32_t vendor_id) {
-    auto& driver = env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_6).set_discovery_type(ManifestDiscoveryType::null_dir));
+    auto& driver = env.add_icd(TEST_ICD_PATH_VERSION_6, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::null_dir));
     driver.set_min_icd_interface_version(5);
     driver.set_max_icd_interface_version(6);
     driver.setup_WSI();
@@ -5003,7 +4978,7 @@ void try_create_swapchain(InstWrapper& inst, VkPhysicalDevice physical_device, D
 }
 
 void add_driver_for_unloading_testing(FrameworkEnvironment& env) {
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    env.add_icd(TEST_ICD_PATH_VERSION_2)
         .add_instance_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
         .setup_WSI()
         .add_physical_device(PhysicalDevice{}
@@ -5013,7 +4988,7 @@ void add_driver_for_unloading_testing(FrameworkEnvironment& env) {
 }
 
 void add_empty_driver_for_unloading_testing(FrameworkEnvironment& env) {
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_instance_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME).setup_WSI();
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_instance_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME).setup_WSI();
 }
 
 TEST(DriverUnloadingFromZeroPhysDevs, InterspersedThroughout) {

@@ -25,9 +25,9 @@
  * Author: Charles Giessen <charles@lunarg.com>
  */
 
+#include "manifest_builders.h"
 #include "test_environment.h"
 
-#include <fstream>
 #include <mutex>
 
 struct MemoryTrackerSettings {
@@ -184,7 +184,7 @@ class MemoryTracker {
 // a CreateInstance/DestroyInstance call pair.
 TEST(Allocation, Instance) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     MemoryTracker tracker;
     {
@@ -198,7 +198,7 @@ TEST(Allocation, Instance) {
 // a CreateInstance/DestroyInstance call pair with a call to GetInstanceProcAddr.
 TEST(Allocation, GetInstanceProcAddr) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     MemoryTracker tracker;
     {
@@ -216,7 +216,7 @@ TEST(Allocation, GetInstanceProcAddr) {
 // a vkEnumeratePhysicalDevices call pair.
 TEST(Allocation, EnumeratePhysicalDevices) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).add_physical_device("physical_device_0");
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device("physical_device_0");
 
     MemoryTracker tracker;
     {
@@ -239,7 +239,7 @@ TEST(Allocation, EnumeratePhysicalDevices) {
 // allocators used on both the instance and device.
 TEST(Allocation, InstanceAndDevice) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    env.add_icd(TEST_ICD_PATH_VERSION_2)
         .add_physical_device(PhysicalDevice{"physical_device_0"}
                                  .add_queue_family_properties({{VK_QUEUE_GRAPHICS_BIT, 1, 0, {1, 1, 1}}, false})
                                  .finish());
@@ -288,7 +288,7 @@ TEST(Allocation, InstanceAndDevice) {
 // allocators used on only the instance and not the device.
 TEST(Allocation, InstanceButNotDevice) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    env.add_icd(TEST_ICD_PATH_VERSION_2)
         .add_physical_device(PhysicalDevice{"physical_device_0"}
                                  .add_queue_family_properties({{VK_QUEUE_GRAPHICS_BIT, 1, 0, {1, 1, 1}}, false})
                                  .finish());
@@ -337,17 +337,16 @@ TEST(Allocation, InstanceButNotDevice) {
 // allocators used on only the device and not the instance.
 TEST(Allocation, DeviceButNotInstance) {
     FrameworkEnvironment env{};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    env.add_icd(TEST_ICD_PATH_VERSION_2)
         .add_physical_device(PhysicalDevice{"physical_device_0"}
                                  .add_queue_family_properties({{VK_QUEUE_GRAPHICS_BIT, 1, 0, {1, 1, 1}}, false})
                                  .finish());
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     MemoryTracker tracker;
@@ -394,14 +393,13 @@ TEST(Allocation, DeviceButNotInstance) {
 // one of the out-of-memory conditions trigger.
 TEST(Allocation, CreateInstanceIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     size_t fail_index = 0;
@@ -424,7 +422,7 @@ TEST(Allocation, CreateInstanceIntentionalAllocFail) {
 // one of the out-of-memory conditions trigger and there are invalid jsons in the same folder
 TEST(Allocation, CreateInstanceIntentionalAllocFailInvalidManifests) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     std::vector<std::string> invalid_jsons;
     invalid_jsons.push_back(",");
@@ -446,11 +444,10 @@ TEST(Allocation, CreateInstanceIntentionalAllocFailInvalidManifests) {
     }
 
     const char* layer_name = "VkLayerImplicit0";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
 
     size_t fail_index = 0;
     VkResult result = VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -472,14 +469,13 @@ TEST(Allocation, CreateInstanceIntentionalAllocFailInvalidManifests) {
 // one of the out-of-memory conditions trigger.
 TEST(Allocation, CreateSurfaceIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).setup_WSI();
+    env.add_icd(TEST_ICD_PATH_VERSION_2).setup_WSI();
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     size_t fail_index = 0;
@@ -517,14 +513,13 @@ TEST(Allocation, CreateSurfaceIntentionalAllocFail) {
 // one of the out-of-memory conditions trigger.
 TEST(Allocation, CreateInstanceIntentionalAllocFailWithSettingsFilePresent) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     env.update_loader_settings(
@@ -554,14 +549,13 @@ TEST(Allocation, CreateInstanceIntentionalAllocFailWithSettingsFilePresent) {
 // one of the out-of-memory conditions trigger.
 TEST(Allocation, CreateSurfaceIntentionalAllocFailWithSettingsFilePresent) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)).setup_WSI();
+    env.add_icd(TEST_ICD_PATH_VERSION_2).setup_WSI();
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
     env.update_loader_settings(
         env.loader_settings.add_app_specific_setting(AppSpecificSettings{}.add_stderr_log_filter("all").add_layer_configuration(
@@ -605,14 +599,13 @@ TEST(Allocation, CreateSurfaceIntentionalAllocFailWithSettingsFilePresent) {
 // one of the out-of-memory conditions trigger.
 TEST(Allocation, DriverEnvVarIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails{TEST_ICD_PATH_VERSION_2}.set_discovery_type(ManifestDiscoveryType::env_var));
+    env.add_icd(TEST_ICD_PATH_VERSION_2, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::env_var));
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     env.env_var_vk_icd_filenames.add_to_list("totally_made_up/path_to_fake/jason_file.json");
@@ -639,7 +632,7 @@ TEST(Allocation, DriverEnvVarIntentionalAllocFail) {
 // may fail.
 TEST(Allocation, CreateDeviceIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2))
+    env.add_icd(TEST_ICD_PATH_VERSION_2)
         .add_physical_device(PhysicalDevice{"physical_device_0"}
                                  .add_queue_family_properties({{VK_QUEUE_GRAPHICS_BIT, 1, 0, {1, 1, 1}}, false})
                                  .finish())
@@ -648,11 +641,10 @@ TEST(Allocation, CreateDeviceIntentionalAllocFail) {
                                  .finish());
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     InstWrapper inst{env.vulkan_functions};
@@ -709,9 +701,8 @@ TEST(Allocation, CreateInstanceDeviceIntentionalAllocFail) {
     uint32_t num_physical_devices = 4;
     uint32_t num_implicit_layers = 3;
     for (uint32_t i = 0; i < num_physical_devices; i++) {
-        env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2)
-                        .icd_manifest.set_is_portability_driver(false)
-                        .set_library_arch(sizeof(void*) == 8 ? "64" : "32"))
+        env.add_icd(TEST_ICD_PATH_VERSION_2, {},
+                    ManifestICD{}.set_is_portability_driver(false).set_library_arch(sizeof(void*) == 8 ? "64" : "32"))
             .set_icd_api_version(VK_API_VERSION_1_1)
             .add_instance_extension("VK_KHR_get_physical_device_properties2")
             .add_and_get_physical_device("physical_device_0")
@@ -719,13 +710,13 @@ TEST(Allocation, CreateInstanceDeviceIntentionalAllocFail) {
             .add_extensions({"VK_EXT_one", "VK_EXT_two", "VK_EXT_three", "VK_EXT_four", "VK_EXT_five"});
     }
 
-    env.add_icd(TestICDDetails(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE).set_is_fake(true));
+    env.add_icd(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE, ManifestOptions{}.set_is_fake(true));
 
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_7).set_discovery_type(ManifestDiscoveryType::none));
+    env.add_icd(TEST_ICD_PATH_VERSION_7, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::none));
 
     VkDirectDriverLoadingInfoLUNARG ddl_info{};
     ddl_info.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_INFO_LUNARG;
-    ddl_info.pfnGetInstanceProcAddr = env.icds.back().icd_library.get_symbol("vk_icdGetInstanceProcAddr");
+    ddl_info.pfnGetInstanceProcAddr = env.icds.back().library.get_symbol("vk_icdGetInstanceProcAddr");
 
     VkDirectDriverLoadingListLUNARG ddl_list{};
     ddl_list.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_LIST_LUNARG;
@@ -734,18 +725,16 @@ TEST(Allocation, CreateInstanceDeviceIntentionalAllocFail) {
     ddl_list.pDrivers = &ddl_info;
 
     const char* layer_name = "VK_LAYER_ImplicitAllocFail";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
     for (uint32_t i = 1; i < num_implicit_layers + 1; i++) {
-        env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                             .set_name("VK_LAYER_Implicit1" + std::to_string(i))
-                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                             .set_disable_environment("DISABLE_ENV")),
-                               "test_layer_" + std::to_string(i) + ".json");
+        env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                                 .set_name("VK_LAYER_Implicit1" + std::to_string(i))
+                                                                 .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                                 .set_disable_environment("DISABLE_ENV")));
     }
     // Throw in a complex json file to flex the json allocation routines
     env.write_file_from_source(COMPLEX_JSON_FILE, ManifestCategory::explicit_layer, ManifestLocation::explicit_layer,
@@ -827,15 +816,14 @@ TEST(Allocation, CreateInstanceDeviceIntentionalAllocFail) {
 // an incompatible driver exists
 TEST(TryLoadWrongBinaries, CreateInstanceIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
-    env.add_icd(TestICDDetails(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE).set_is_fake(true));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
+    env.add_icd(CURRENT_PLATFORM_DUMMY_BINARY_WRONG_TYPE, ManifestOptions{}.set_is_fake(true));
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     size_t fail_index = 0;
@@ -859,14 +847,13 @@ TEST(TryLoadWrongBinaries, CreateInstanceIntentionalAllocFail) {
 // leak memory if one of the out-of-memory conditions trigger.
 TEST(Allocation, EnumeratePhysicalDevicesIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     size_t fail_index = 0;
@@ -970,8 +957,8 @@ TEST(Allocation, EnumeratePhysicalDevicesIntentionalAllocFail) {
 // leak memory if one of the out-of-memory conditions trigger.
 TEST(Allocation, CreateInstanceDeviceWithDXGIDriverIntentionalAllocFail) {
     FrameworkEnvironment env{FrameworkSettings{}.set_log_filter("error,warn")};
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_6).set_discovery_type(ManifestDiscoveryType::null_dir));
-    env.add_icd(TestICDDetails(TEST_ICD_PATH_VERSION_2));
+    env.add_icd(TEST_ICD_PATH_VERSION_6, ManifestOptions{}.set_discovery_type(ManifestDiscoveryType::null_dir));
+    env.add_icd(TEST_ICD_PATH_VERSION_2);
 
     for (uint32_t i = 0; i < 2; i++) {
         auto& driver = env.get_test_icd(i);
@@ -980,11 +967,10 @@ TEST(Allocation, CreateInstanceDeviceWithDXGIDriverIntentionalAllocFail) {
     }
 
     const char* layer_name = "VK_LAYER_implicit";
-    env.add_implicit_layer(ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
-                                                         .set_name(layer_name)
-                                                         .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
-                                                         .set_disable_environment("DISABLE_ENV")),
-                           "test_layer.json");
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ENV")));
     env.get_test_layer().set_do_spurious_allocations_in_create_instance(true).set_do_spurious_allocations_in_create_device(true);
 
     auto& known_driver = known_driver_list.at(2);  // which drive this test pretends to be
