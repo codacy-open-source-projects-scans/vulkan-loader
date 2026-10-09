@@ -134,6 +134,10 @@
 #define VK_VENDOR_ID_FILTER_ENV_VAR "VK_LOADER_VENDOR_ID_FILTER"
 #define VK_DRIVER_ID_FILTER_ENV_VAR "VK_LOADER_DRIVER_ID_FILTER"
 
+#if defined(__APPLE__)
+#define VK_LOADER_SEARCH_ONLY_IN_BUNDLE_ENV_VAR "VK_LOADER_SEARCH_ONLY_IN_BUNDLE"
+#endif
+
 // Override layer information
 #define VK_OVERRIDE_LAYER_NAME "VK_LAYER_LUNARG_override"
 
@@ -283,21 +287,18 @@ static inline void loader_platform_thread_win32_once_fn(INIT_ONCE *ctl, PINIT_ON
 
 // File IO
 static inline bool loader_platform_file_exists(const char *path) {
-    if (access(path, F_OK))
-        return false;
-    else
-        return true;
+    if (access(path, F_OK)) return false;
+    return true;
 }
 
 // Returns true if the given string appears to be a relative or absolute
 // path, as opposed to a bare filename.
 static inline bool loader_platform_is_path_absolute(const char *path) {
-    if (path[0] == '/')
-        return true;
-    else
-        return false;
+    if (path[0] == '/') return true;
+    return false;
 }
 
+// NOLINTNEXTLINE(concurrency-mt-unsafe) - no portable reentrant dirname; the returned buffer is copied by callers immediately
 static inline char *loader_platform_dirname(char *path) { return dirname(path); }
 
 // loader_platform_executable_path finds application path + name.
@@ -307,6 +308,9 @@ static inline char *loader_platform_executable_path(char *buffer, size_t size) {
     ssize_t count = readlink("/proc/self/exe", buffer, size);
     if (count == -1) return NULL;
     if (count == 0) return NULL;
+    // readlink does not append a null terminator and returns up to size bytes, so a target of size or more
+    // would leave no room for the terminator and buffer[count] would write past the end.
+    if ((size_t)count >= size) return NULL;
     buffer[count] = '\0';
     return buffer;
 }
@@ -420,6 +424,7 @@ static inline const char *loader_platform_open_library_error(const char *libPath
 #if defined(__Fuchsia__)
     return dlerror_fuchsia();
 #else
+    // NOLINTNEXTLINE(concurrency-mt-unsafe) - dlerror has no reentrant variant; the message is used immediately, not retained
     return dlerror();
 #endif
 }
@@ -437,6 +442,7 @@ static inline void *loader_platform_get_proc_address(loader_platform_dl_handle l
 }
 static inline const char *loader_platform_get_proc_address_error(const char *name) {
     (void)name;
+    // NOLINTNEXTLINE(concurrency-mt-unsafe) - dlerror has no reentrant variant; the message is used immediately, not retained
     return dlerror();
 }
 

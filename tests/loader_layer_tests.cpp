@@ -1398,6 +1398,71 @@ TEST(MetaLayers, MetaLayerWhichAddsMetaLayer) {
                                    " which also contains meta-layer " + meta_layer_name));
 }
 
+// A meta-layer cycle discovered through normal manifest scanning (VK_LAYER_PATH / standard layer discovery,
+// not a settings.json file) exercises verify_meta_layer_component_layers's already_checked_meta_layers guard,
+// as opposed to CyclicMetaLayerComponentDoesNotRecurse (loader_settings_tests.cpp) which exercises
+// loader_add_meta_layer's is_being_expanded guard used only by the settings-file path.
+TEST(MetaLayers, CyclicMetaLayerComponentsFoundThroughManifestDiscovery) {
+    FrameworkEnvironment env;
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
+
+    const char* meta_a = "VK_LAYER_meta_A";
+    const char* meta_b = "VK_LAYER_meta_B";
+    env.add_explicit_layer({}, ManifestLayer{}.set_file_format_version({1, 2, 0}).add_layer(
+                                   ManifestLayer::LayerDescription{}.set_name(meta_a).add_component_layer(meta_b)));
+    env.add_explicit_layer({}, ManifestLayer{}.set_file_format_version({1, 2, 0}).add_layer(
+                                   ManifestLayer::LayerDescription{}.set_name(meta_b).add_component_layer(meta_a)));
+
+    InstWrapper inst{env.vulkan_functions};
+    FillDebugUtilsCreateDetails(inst.create_info, env.debug_log);
+    // Before the already_checked_meta_layers guard, this recursion would stack overflow instead of returning.
+    inst.CheckCreate();
+    ASSERT_TRUE(env.debug_log.find("Recursive dependency between Meta-layer"));
+
+    // Both cyclic meta-layers are considered invalid and are dropped from the instance layer list entirely.
+    env.GetLayerProperties(0);
+}
+
+// Stress test for a long, strictly acyclic chain of meta-layers: meta_0 -> meta_1 -> ... -> meta_{N-1} -> a
+// real (non-meta) terminal layer. Neither loader_add_meta_layer nor verify_meta_layer_component_layers has a
+// maximum-depth guard - only a cycle guard - so both recurse to a depth proportional to the chain length. This
+// test does not assert a depth limit (there isn't one); it exists to make that unbounded-recursion risk area
+// measurable, and to catch a regression if a future change makes the existing cycle guards ineffective (which
+// would turn this bounded, acyclic chain into a crash/hang instead of a successful, if deep, CheckCreate()).
+// Chain depths in the hundreds were observed to crash (stack overflow) on some CI platforms with smaller
+// default thread stacks than Linux/x86_64, so a conservative depth is used here - enough to exercise several
+// tens of levels of mutual recursion without depending on a platform-specific stack size.
+TEST(MetaLayers, DeepAcyclicMetaLayerChainDoesNotCrash) {
+    FrameworkEnvironment env;
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA);
+
+    const int chain_depth = 50;
+    const char* real_layer_name = "VK_LAYER_TestLayer";
+    env.add_explicit_layer(
+        {}, ManifestLayer{}.add_layer(
+                ManifestLayer::LayerDescription{}.set_name(real_layer_name).set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)));
+
+    std::vector<std::string> meta_layer_names;
+    meta_layer_names.reserve(chain_depth);
+    for (int i = 0; i < chain_depth; i++) {
+        meta_layer_names.push_back(std::string("VK_LAYER_meta_chain_") + std::to_string(i));
+    }
+    for (int i = 0; i < chain_depth; i++) {
+        const std::string& next_layer = (i + 1 < chain_depth) ? meta_layer_names[i + 1] : std::string(real_layer_name);
+        env.add_explicit_layer(
+            {}, ManifestLayer{}.set_file_format_version({1, 2, 0}).add_layer(
+                    ManifestLayer::LayerDescription{}.set_name(meta_layer_names[i].c_str()).add_component_layer(next_layer)));
+    }
+
+    InstWrapper inst{env.vulkan_functions};
+    inst.create_info.add_layer(meta_layer_names[0].c_str());
+    FillDebugUtilsCreateDetails(inst.create_info, env.debug_log);
+    inst.CheckCreate();
+
+    // The whole chain should have been found valid and expanded down to the real terminal layer.
+    env.GetLayerProperties(static_cast<uint32_t>(chain_depth) + 1);
+}
+
 TEST(MetaLayers, InstanceExtensionInComponentLayer) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).add_physical_device({});
@@ -1822,7 +1887,7 @@ TEST(OverrideMetaLayer, OverridePathsInteractionWithVK_LAYER_PATH) {
         std::string("Ignoring VK_LAYER_PATH. The Override layer is active and has override paths set, which takes priority. "
                     "VK_LAYER_PATH is set to ") +
         env.env_var_vk_layer_paths.value()));
-    ASSERT_TRUE(env.debug_log.find("Override layer has override paths set to " + meta_layer_path.string()));
+    ASSERT_TRUE(env.debug_log.find("Override layer has override path " + meta_layer_path.string()));
 
     env.layers.clear();
 }
@@ -1995,7 +2060,7 @@ TEST(OverrideMetaLayer, RunningWithRegularPrivilegesFromSecureLocation) {
 }
 
 TEST(OverrideMetaLayer, RunningWithElevatedPrivilegesFromSecureLocation) {
-    FrameworkEnvironment env{FrameworkSettings{}.set_run_as_if_with_elevated_privleges(true)};
+    FrameworkEnvironment env{FrameworkSettings{}.set_run_as_if_with_elevated_privileges(true)};
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).add_physical_device({});
 
     auto& override_layer_folder = env.get_folder(ManifestLocation::override_layer);
@@ -2068,7 +2133,7 @@ TEST(OverrideMetaLayer, RunningWithRegularPrivilegesFromUnsecureLocation) {
 }
 
 TEST(OverrideMetaLayer, RunningWithElevatedPrivilegesFromUnsecureLocation) {
-    FrameworkEnvironment env{FrameworkSettings{}.set_run_as_if_with_elevated_privleges(true)};
+    FrameworkEnvironment env{FrameworkSettings{}.set_run_as_if_with_elevated_privileges(true)};
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA).add_physical_device({});
 
     auto& override_layer_folder = env.get_folder(ManifestLocation::override_layer);
@@ -3508,7 +3573,7 @@ TEST(TestLayers, ExplicitlyEnableImplicitLayer) {
     uint32_t api_version = VK_API_VERSION_1_2;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(api_version))
         .set_icd_api_version(api_version)
-        .add_physical_device(PhysicalDevice{}.set_api_version(api_version).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(api_version));
 
     const char* regular_layer_name = "VK_LAYER_TestLayer1";
     env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
@@ -3538,7 +3603,7 @@ TEST(TestLayers, NewerInstanceVersionThanImplicitLayer) {
     uint32_t api_version = VK_API_VERSION_1_2;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(api_version))
         .set_icd_api_version(api_version)
-        .add_physical_device(PhysicalDevice{}.set_api_version(api_version).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(api_version));
 
     const char* regular_layer_name = "VK_LAYER_TestLayer1";
     env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
@@ -3578,7 +3643,7 @@ TEST(TestLayers, ImplicitLayerPre10APIVersion) {
     uint32_t api_version = VK_API_VERSION_1_2;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(api_version))
         .set_icd_api_version(api_version)
-        .add_physical_device(PhysicalDevice{}.set_api_version(api_version).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(api_version));
 
     const char* regular_layer_name = "VK_LAYER_TestLayer1";
     env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
@@ -3639,7 +3704,7 @@ TEST(TestLayers, InstEnvironEnableExplicitLayer) {
     uint32_t api_version = VK_API_VERSION_1_2;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(api_version))
         .set_icd_api_version(api_version)
-        .add_physical_device(PhysicalDevice{}.set_api_version(api_version).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(api_version));
 
     const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
     env.add_explicit_layer(
@@ -3877,6 +3942,48 @@ TEST(TestLayers, EnvironLayerEnableExplicitLayer) {
     ASSERT_TRUE(env.debug_log.find_prefix_then_postfix("Insert instance layer", explicit_layer_name_3));
     ASSERT_TRUE(env.debug_log.find_prefix_then_postfix(explicit_layer_name_3, "forced enabled due to env var"));
     ASSERT_FALSE(env.debug_log.find_prefix_then_postfix(explicit_layer_name_3, "disabled because name matches filter of env var"));
+}
+
+// Verify that a layer enabled through VK_INSTANCE_LAYERS reports the correct "Enabled By" reason
+TEST(TestLayers, EnabledByReportsVkInstanceLayers) {
+    FrameworkEnvironment env;
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_2))
+        .add_physical_device(PhysicalDevice{});
+
+    const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
+    env.add_explicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(explicit_layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_api_version(VK_MAKE_API_VERSION(0, 1, 0, 0))));
+
+    EnvVarWrapper instance_layers_env_var{"VK_INSTANCE_LAYERS", explicit_layer_name};
+
+    InstWrapper inst{env.vulkan_functions};
+    FillDebugUtilsCreateDetails(inst.create_info, env.debug_log);
+    inst.CheckCreate();
+
+    ASSERT_TRUE(env.debug_log.find("Enabled By: Environment Variable VK_INSTANCE_LAYERS"));
+}
+
+// Verify that a layer enabled through VK_LOADER_LAYERS_ENABLE reports the correct "Enabled By" reason
+TEST(TestLayers, EnabledByReportsVkLoaderLayersEnable) {
+    FrameworkEnvironment env;
+    env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_2))
+        .add_physical_device(PhysicalDevice{});
+
+    const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
+    env.add_explicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name(explicit_layer_name)
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_api_version(VK_MAKE_API_VERSION(0, 1, 0, 0))));
+
+    EnvVarWrapper layers_enable_env_var{"VK_LOADER_LAYERS_ENABLE", explicit_layer_name};
+
+    InstWrapper inst{env.vulkan_functions};
+    FillDebugUtilsCreateDetails(inst.create_info, env.debug_log);
+    inst.CheckCreate();
+
+    ASSERT_TRUE(env.debug_log.find("Enabled By: Environment Variable VK_LOADER_LAYERS_ENABLE"));
 }
 
 // Verify that VK_LOADER_LAYERS_DISABLE work.  To test this, make sure that an explicit layer does not affect an instance until
@@ -4191,6 +4298,9 @@ TEST(TestLayers, EnvironLayerEnableDisableExplicitLayer) {
     ASSERT_TRUE(env.debug_log.find_prefix_then_postfix("Insert instance layer", explicit_layer_name_3));
     ASSERT_TRUE(env.debug_log.find_prefix_then_postfix(explicit_layer_name_3, "forced enabled due to env var"));
     ASSERT_FALSE(env.debug_log.find_prefix_then_postfix(explicit_layer_name_3, "disabled because name matches filter of env var"));
+    // layer_3 also matches VK_LOADER_LAYERS_DISABLE ("*Second*"), but VK_LOADER_LAYERS_ENABLE overrides it - it should not
+    // also log that it was ignored as disabled.
+    ASSERT_FALSE(env.debug_log.find_prefix_then_postfix(explicit_layer_name_3, "ignored because it has been disabled"));
 
     // Disable all but enable 2
     // ------------------------------------------
@@ -4639,7 +4749,7 @@ TEST(TestLayers, DoNotUseDeviceLayer) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_2))
         .set_icd_api_version(VK_API_VERSION_1_2)
-        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2));
 
     const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
     env.add_explicit_layer(
@@ -4698,7 +4808,7 @@ TEST(TestLayers, InstanceAndDeviceLayer) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_2))
         .set_icd_api_version(VK_API_VERSION_1_2)
-        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2));
 
     const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
     env.add_explicit_layer(
@@ -4734,7 +4844,7 @@ TEST(TestLayers, DeviceLayerNotPresent) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2_EXPORT_ICD_GPDPA, {}, ManifestICD{}.set_api_version(VK_API_VERSION_1_2))
         .set_icd_api_version(VK_API_VERSION_1_2)
-        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2).finish());
+        .add_physical_device(PhysicalDevice{}.set_api_version(VK_API_VERSION_1_2));
     const char* explicit_layer_name = "VK_LAYER_LUNARG_wrap_objects";
 
     InstWrapper inst{env.vulkan_functions};
@@ -4775,9 +4885,8 @@ TEST(LayerPhysDeviceMod, AddPhysicalDevices) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_devices = 6;
 
@@ -4851,9 +4960,8 @@ TEST(LayerPhysDeviceMod, RemovePhysicalDevices) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_devices = 6;
 
@@ -4900,9 +5008,8 @@ TEST(LayerPhysDeviceMod, ReorderPhysicalDevices) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_devices = 6;
 
@@ -4949,9 +5056,8 @@ TEST(LayerPhysDeviceMod, AddRemoveAndReorderPhysicalDevices) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_devices = 6;
 
@@ -5024,9 +5130,8 @@ TEST(LayerPhysDeviceMod, AddPhysicalDeviceGroups) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_groups = 4;
 
@@ -5110,9 +5215,8 @@ TEST(LayerPhysDeviceMod, RemovePhysicalDeviceGroups) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_groups = 3;
 
@@ -5161,9 +5265,8 @@ TEST(LayerPhysDeviceMod, ReorderPhysicalDeviceGroups) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[1]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[2]);
+        cur_icd.physical_device_groups.emplace_back(0);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({1, 2}));
     }
     const uint32_t icd_groups = 4;
 
@@ -5212,9 +5315,8 @@ TEST(LayerPhysDeviceMod, AddRemoveAndReorderPhysicalDeviceGroups) {
 #endif
             added_phys_devs[dev] = &cur_icd.add_and_get_physical_device({}).set_properties(properties);
         }
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[0]);
-        cur_icd.physical_device_groups.back().use_physical_device(added_phys_devs[1]);
-        cur_icd.physical_device_groups.emplace_back(added_phys_devs[2]);
+        cur_icd.physical_device_groups.push_back(PhysicalDeviceGroup({0, 1}));
+        cur_icd.physical_device_groups.emplace_back(2);
     }
     const uint32_t icd_groups = 4;
 
@@ -5479,7 +5581,7 @@ TEST(TestLayers, AllowFilterWithImplicitLayer) {
     }
 }
 
-TEST(TestLayers, AllowFilterWithConditionallyImlicitLayer) {
+TEST(TestLayers, AllowFilterWithConditionallyImplicitLayer) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
     const char* layer_name = "VK_LAYER_test_layer";
@@ -5560,7 +5662,7 @@ TEST(TestLayers, AllowFilterWithConditionallyImlicitLayer) {
 
     env.remove_loader_settings();
 
-    // Repeate the above tests but with the enable_environment variable set
+    // Repeat the above tests but with the enable_environment variable set
     EnvVarWrapper set_enable_env_var{enable_env_var, "1"};
 
     {
@@ -5633,7 +5735,7 @@ TEST(TestLayers, AllowFilterWithConditionallyImlicitLayer) {
     }
 }
 
-TEST(TestLayers, AllowFilterWithConditionallyImlicitLayerWithOverrideLayer) {
+TEST(TestLayers, AllowFilterWithConditionallyImplicitLayerWithOverrideLayer) {
     FrameworkEnvironment env;
     env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
     const char* layer_name = "VK_LAYER_test_layer";
@@ -5727,4 +5829,22 @@ TEST(TestLayers, AllowFilterWithConditionallyImlicitLayerWithOverrideLayer) {
 
         ASSERT_NO_FATAL_FAILURE(inst.GetActiveLayers(inst.GetPhysDev(), 0));
     }
+}
+
+TEST(TestLayers, LayerFailsNegotiateLoaderLayerInterfaceVersion) {
+    FrameworkEnvironment env;
+    env.add_icd(TEST_ICD_PATH_VERSION_2).add_physical_device({});
+
+    env.add_implicit_layer({}, ManifestLayer{}.add_layer(ManifestLayer::LayerDescription{}
+                                                             .set_name("VK_LAYER_test_layer")
+                                                             .set_lib_path(TEST_LAYER_PATH_EXPORT_VERSION_2)
+                                                             .set_disable_environment("DISABLE_ME")));
+    env.get_test_layer().set_fail_negotiateLoaderLayerInterfaceVersion(true);
+
+    env.GetLayerProperties(1);
+
+    InstWrapper inst{env.vulkan_functions};
+    inst.CheckCreate();
+
+    inst.GetActiveLayers(inst.GetPhysDev(), 0);
 }

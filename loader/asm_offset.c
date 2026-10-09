@@ -130,6 +130,8 @@ int main(int argc, char **argv) {
     };
 
     FILE *file = loader_fopen("gen_defines.asm", "w");
+    // NOLINTBEGIN(cert-err33-c) - this is a build-time code generator run by developers, not part of the loader's
+    // runtime attack surface; a failed write here is immediately visible as a broken build, not worth per-call checks.
     fprintf(file, "\n");
     if (assembler == MASM) {
         for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
@@ -137,7 +139,7 @@ int main(int argc, char **argv) {
         }
     } else if (assembler == MARMASM) {
         fprintf(file, "    AREA    loader_structs_details, DATA,READONLY\n");
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC)
         fprintf(file, "AARCH_64 EQU 1\n");
 #else
         fprintf(file, "AARCH_64 EQU 0\n");
@@ -168,5 +170,11 @@ int main(int argc, char **argv) {
                     values[i].comment);
         }
     }
+    if (ferror(file)) {
+        fclose(file);
+        fprintf(stderr, "Error: failed to write gen_defines.asm\n");
+        return 1;
+    }
+    // NOLINTEND(cert-err33-c)
     return fclose(file);
 }

@@ -23,13 +23,10 @@
 #include <string>
 #include <algorithm>
 #include <assert.h>
-#include <unordered_map>
-#include <memory>
 #include <vector>
 
 #include "vulkan/vk_layer.h"
 #include "generated/vk_dispatch_table_helper.h"
-#include "loader/vk_loader_layer.h"
 
 // Export full support of instance extension VK_EXT_direct_mode_display extension
 #if !defined(TEST_LAYER_EXPORT_DIRECT_DISP)
@@ -85,7 +82,7 @@ struct wrapped_dev_obj {
     PFN_vkSetDeviceLoaderData pfn_dev_init;
     PFN_vkGetDeviceProcAddr pfn_get_dev_proc_addr;
     VkDevice obj;
-    bool maintanence_1_enabled;
+    bool maintenance_1_enabled;
     bool present_image_enabled;
     bool debug_utils_enabled;
     bool debug_report_enabled;
@@ -104,7 +101,7 @@ struct saved_wrapped_handles_storage {
     std::vector<wrapped_debug_util_mess_obj *> debug_util_messengers;
 };
 
-saved_wrapped_handles_storage saved_wrapped_handles;
+static saved_wrapped_handles_storage saved_wrapped_handles;
 
 VkInstance unwrap_instance(const VkInstance instance, wrapped_inst_obj **inst) {
     *inst = reinterpret_cast<wrapped_inst_obj *>(instance);
@@ -159,7 +156,7 @@ const VkLayerProperties global_layer = {
     "LunarG Test Layer",
 };
 
-uint32_t loader_layer_if_version = CURRENT_LOADER_LAYER_INTERFACE_VERSION;
+static uint32_t loader_layer_if_version = CURRENT_LOADER_LAYER_INTERFACE_VERSION;
 
 VKAPI_ATTR VkResult VKAPI_CALL wrap_vkCreateInstance(const VkInstanceCreateInfo *pCreateInfo,
                                                      const VkAllocationCallbacks *pAllocator, VkInstance *pInstance) {
@@ -406,7 +403,7 @@ VKAPI_ATTR VkResult VKAPI_CALL wrap_vkEnumeratePhysicalDevices(VkInstance instan
             }
             phys_devs[i].obj = reinterpret_cast<void *>(pPhysicalDevices[i]);
             phys_devs[i].inst = inst;
-            pPhysicalDevices[i] = reinterpret_cast<VkPhysicalDevice>(&phys_devs[i]);
+            pPhysicalDevices[i] = reinterpret_cast<VkPhysicalDevice>(phys_devs + i);
         }
     }
     return result;
@@ -416,6 +413,13 @@ VKAPI_ATTR void VKAPI_CALL vkGetPhysicalDeviceProperties(VkPhysicalDevice physic
     wrapped_phys_dev_obj *phys_dev;
     auto vk_phys_dev = unwrap_phys_dev(physicalDevice, &phys_dev);
     phys_dev->inst->layer_disp.GetPhysicalDeviceProperties(vk_phys_dev, pProperties);
+}
+
+VKAPI_ATTR void VKAPI_CALL wrap_vkGetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
+                                                               VkPhysicalDeviceProperties2 *pProperties) {
+    wrapped_phys_dev_obj *phys_dev;
+    auto vk_phys_dev = unwrap_phys_dev(physicalDevice, &phys_dev);
+    phys_dev->inst->layer_disp.GetPhysicalDeviceProperties2(vk_phys_dev, pProperties);
 }
 
 VKAPI_ATTR void VKAPI_CALL wrap_vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice,
@@ -531,7 +535,7 @@ VKAPI_ATTR VkResult VKAPI_CALL wrap_vkCreateDevice(VkPhysicalDevice physicalDevi
     for (uint32_t ext = 0; ext < pCreateInfo->enabledExtensionCount; ++ext) {
         if (!strcmp(pCreateInfo->ppEnabledExtensionNames[ext], VK_KHR_MAINTENANCE1_EXTENSION_NAME)) {
 #if TEST_LAYER_EXPORT_MAINT_1
-            dev->maintanence_1_enabled = true;
+            dev->maintenance_1_enabled = true;
 #endif
         }
         if (!strcmp(pCreateInfo->ppEnabledExtensionNames[ext], VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME)) {
@@ -680,7 +684,7 @@ PFN_vkVoidFunction layer_intercept_device_proc(wrapped_dev_obj *dev, const char 
     if (!strcmp(name, "CreateDevice")) return (PFN_vkVoidFunction)wrap_vkCreateDevice;
     if (!strcmp(name, "DestroyDevice")) return (PFN_vkVoidFunction)wrap_vkDestroyDevice;
 
-    if (dev->maintanence_1_enabled && !strcmp(name, "TrimCommandPoolKHR")) return (PFN_vkVoidFunction)wrap_vkTrimCommandPoolKHR;
+    if (dev->maintenance_1_enabled && !strcmp(name, "TrimCommandPoolKHR")) return (PFN_vkVoidFunction)wrap_vkTrimCommandPoolKHR;
     if (dev->present_image_enabled && !strcmp(name, "GetSwapchainStatusKHR"))
         return (PFN_vkVoidFunction)wrap_vkGetSwapchainStatusKHR;
 
@@ -730,6 +734,7 @@ PFN_vkVoidFunction layer_intercept_instance_proc(wrapped_inst_obj *inst, const c
     if (!strcmp(name, "DestroyDebugUtilsMessengerEXT")) return (PFN_vkVoidFunction)wrap_vkDestroyDebugUtilsMessengerEXT;
 
     if (!strcmp(name, "GetPhysicalDeviceProperties")) return (PFN_vkVoidFunction)vkGetPhysicalDeviceProperties;
+    if (!strcmp(name, "GetPhysicalDeviceProperties2")) return (PFN_vkVoidFunction)wrap_vkGetPhysicalDeviceProperties2;
     if (!strcmp(name, "GetPhysicalDeviceQueueFamilyProperties"))
         return (PFN_vkVoidFunction)wrap_vkGetPhysicalDeviceQueueFamilyProperties;
 

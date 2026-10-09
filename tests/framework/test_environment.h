@@ -446,7 +446,7 @@ struct ManifestOptions {
 
 struct FrameworkSettings {
     BUILDER_VALUE_WITH_DEFAULT(const char*, log_filter, "all");
-    BUILDER_VALUE_WITH_DEFAULT(bool, run_as_if_with_elevated_privleges, false);
+    BUILDER_VALUE_WITH_DEFAULT(bool, run_as_if_with_elevated_privileges, false);
 
 #if TESTING_COMMON_UNIX_PLATFORMS
     BUILDER_VALUE_WITH_DEFAULT(std::string, home_env_var, "/home/fake_home");
@@ -541,7 +541,9 @@ struct FrameworkEnvironment {
 
 #if TESTING_COMMON_UNIX_PLATFORMS
     EnvVarWrapper env_var_home{"HOME", "/home/fake_home"};
-#if !defined(__APPLE__)
+#if defined(__APPLE__)
+    EnvVarWrapper env_var_search_only_in_bundle{"VK_LOADER_SEARCH_ONLY_IN_BUNDLE"};
+#else
     EnvVarWrapper env_var_xdg_config_home{"XDG_CONFIG_HOME"};
     EnvVarWrapper env_var_xdg_config_dirs{"XDG_CONFIG_DIRS"};
     EnvVarWrapper env_var_xdg_data_home{"XDG_DATA_HOME"};

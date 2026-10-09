@@ -135,6 +135,7 @@ VkResult util_CreateDebugUtilsMessengers(struct loader_instance *inst, const voi
         if (in_structure.sType == VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT) {
             // Assign a unique handle to each messenger (just use the address of the VkDebugUtilsMessengerCreateInfoEXT)
             // This is only being used this way due to it being for an 'anonymous' callback during instance creation
+            // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
             VkDebugUtilsMessengerEXT messenger_handle = (VkDebugUtilsMessengerEXT)(uintptr_t)pNext;
             VkResult ret = util_CreateDebugUtilsMessenger(inst, (const VkDebugUtilsMessengerCreateInfoEXT *)pNext, pAllocator,
                                                           messenger_handle);
@@ -175,6 +176,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugUtilsMessengerEXT(VkInstanc
     VkResult res = VK_SUCCESS;
     VkLayerDbgFunctionNode *new_dbg_func_node = NULL;
     uint32_t next_index = 0;
+    bool index_reserved = false;
 
     uint32_t *pNextIndex = loader_instance_heap_alloc(inst, sizeof(uint32_t), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
     if (NULL == pNextIndex) {
@@ -186,6 +188,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugUtilsMessengerEXT(VkInstanc
     if (res != VK_SUCCESS) {
         goto out;
     }
+    index_reserved = true;
 
     for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term != NULL; icd_term = icd_term->next) {
         if (icd_term->debug_utils_messenger_list.list == NULL) {
@@ -229,6 +232,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugUtilsMessengerEXT(VkInstanc
     new_dbg_func_node->pNext = inst->current_dbg_function_head;
     inst->current_dbg_function_head = new_dbg_func_node;
     *pNextIndex = next_index;
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
     *pMessenger = (VkDebugUtilsMessengerEXT)(uintptr_t)pNextIndex;
     new_dbg_func_node->messenger.messenger = *pMessenger;
 
@@ -236,20 +240,22 @@ out:
 
     // Roll back on errors
     if (VK_SUCCESS != res) {
-        if (pNextIndex) {
+        if (index_reserved) {
             for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term; icd_term = icd_term->next) {
-                if (icd_term->debug_utils_messenger_list.list && icd_term->debug_utils_messenger_list.list[next_index] &&
+                if (icd_term->debug_utils_messenger_list.list &&
+                    icd_term->debug_utils_messenger_list.capacity > next_index * sizeof(VkDebugUtilsMessengerEXT) &&
+                    icd_term->debug_utils_messenger_list.list[next_index] &&
                     NULL != icd_term->dispatch.DestroyDebugUtilsMessengerEXT) {
                     icd_term->dispatch.DestroyDebugUtilsMessengerEXT(
                         icd_term->instance, icd_term->debug_utils_messenger_list.list[next_index], pAllocator);
                 }
             }
         }
-        if (inst->debug_utils_messengers_list.list &&
-            inst->debug_utils_messengers_list.capacity > (*pNextIndex) * sizeof(struct loader_used_object_status)) {
-            inst->debug_utils_messengers_list.list[*pNextIndex].status = VK_FALSE;
+        if (index_reserved && inst->debug_utils_messengers_list.list &&
+            inst->debug_utils_messengers_list.capacity > next_index * sizeof(struct loader_used_object_status)) {
+            inst->debug_utils_messengers_list.list[next_index].status = VK_FALSE;
             if (NULL != pAllocator) {
-                inst->debug_utils_messengers_list.list[*pNextIndex].allocation_callbacks = *pAllocator;
+                inst->debug_utils_messengers_list.list[next_index].allocation_callbacks = *pAllocator;
             }
         }
         loader_free_with_instance_fallback(pAllocator, inst, new_dbg_func_node);
@@ -263,6 +269,7 @@ out:
 VKAPI_ATTR void VKAPI_CALL terminator_DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT messenger,
                                                                     const VkAllocationCallbacks *pAllocator) {
     struct loader_instance *inst = (struct loader_instance *)instance;
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
     uint32_t *debug_messenger_index = (uint32_t *)(uintptr_t)messenger;
     // Make sure that messenger actually points to anything
     if (NULL == debug_messenger_index) {
@@ -270,7 +277,9 @@ VKAPI_ATTR void VKAPI_CALL terminator_DestroyDebugUtilsMessengerEXT(VkInstance i
     }
 
     for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term; icd_term = icd_term->next) {
-        if (icd_term->debug_utils_messenger_list.list && icd_term->debug_utils_messenger_list.list[*debug_messenger_index] &&
+        if (icd_term->debug_utils_messenger_list.list &&
+            icd_term->debug_utils_messenger_list.capacity > *debug_messenger_index * sizeof(VkDebugUtilsMessengerEXT) &&
+            icd_term->debug_utils_messenger_list.list[*debug_messenger_index] &&
             NULL != icd_term->dispatch.DestroyDebugUtilsMessengerEXT) {
             icd_term->dispatch.DestroyDebugUtilsMessengerEXT(
                 icd_term->instance, icd_term->debug_utils_messenger_list.list[*debug_messenger_index], pAllocator);
@@ -412,6 +421,7 @@ VkResult util_CreateDebugReportCallbacks(struct loader_instance *inst, const voi
         if (in_structure.sType == VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT) {
             // Assign a unique handle to each callback (just use the address of the VkDebugReportCallbackCreateInfoEXT):
             // This is only being used this way due to it being for an 'anonymous' callback during instance creation
+            // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
             VkDebugReportCallbackEXT report_handle = (VkDebugReportCallbackEXT)(uintptr_t)pNext;
             VkResult ret =
                 util_CreateDebugReportCallback(inst, (const VkDebugReportCallbackCreateInfoEXT *)pNext, pAllocator, report_handle);
@@ -453,6 +463,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugReportCallbackEXT(VkInstanc
     VkResult res = VK_SUCCESS;
     VkLayerDbgFunctionNode *new_dbg_func_node = NULL;
     uint32_t next_index = 0;
+    bool index_reserved = false;
 
     uint32_t *pNextIndex = loader_instance_heap_alloc(inst, sizeof(uint32_t), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
     if (NULL == pNextIndex) {
@@ -464,6 +475,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugReportCallbackEXT(VkInstanc
     if (res != VK_SUCCESS) {
         goto out;
     }
+    index_reserved = true;
 
     for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term != NULL; icd_term = icd_term->next) {
         if (icd_term->debug_report_callback_list.list == NULL) {
@@ -507,6 +519,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugReportCallbackEXT(VkInstanc
     new_dbg_func_node->pNext = inst->current_dbg_function_head;
     inst->current_dbg_function_head = new_dbg_func_node;
     *pNextIndex = next_index;
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
     *pCallback = (VkDebugReportCallbackEXT)(uintptr_t)pNextIndex;
     new_dbg_func_node->report.msgCallback = *pCallback;
 
@@ -514,20 +527,22 @@ out:
 
     // Roll back on errors
     if (VK_SUCCESS != res) {
-        if (pNextIndex) {
+        if (index_reserved) {
             for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term; icd_term = icd_term->next) {
-                if (icd_term->debug_report_callback_list.list && icd_term->debug_report_callback_list.list[next_index] &&
+                if (icd_term->debug_report_callback_list.list &&
+                    icd_term->debug_report_callback_list.capacity > next_index * sizeof(VkDebugReportCallbackEXT) &&
+                    icd_term->debug_report_callback_list.list[next_index] &&
                     NULL != icd_term->dispatch.DestroyDebugReportCallbackEXT) {
                     icd_term->dispatch.DestroyDebugReportCallbackEXT(
                         icd_term->instance, icd_term->debug_report_callback_list.list[next_index], pAllocator);
                 }
             }
         }
-        if (inst->debug_report_callbacks_list.list &&
-            inst->debug_report_callbacks_list.capacity > (*pNextIndex) * sizeof(struct loader_used_object_status)) {
-            inst->debug_report_callbacks_list.list[*pNextIndex].status = VK_FALSE;
+        if (index_reserved && inst->debug_report_callbacks_list.list &&
+            inst->debug_report_callbacks_list.capacity > next_index * sizeof(struct loader_used_object_status)) {
+            inst->debug_report_callbacks_list.list[next_index].status = VK_FALSE;
             if (NULL != pAllocator) {
-                inst->debug_report_callbacks_list.list[*pNextIndex].allocation_callbacks = *pAllocator;
+                inst->debug_report_callbacks_list.list[next_index].allocation_callbacks = *pAllocator;
             }
         }
         loader_free_with_instance_fallback(pAllocator, inst, new_dbg_func_node);
@@ -541,13 +556,16 @@ out:
 VKAPI_ATTR void VKAPI_CALL terminator_DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback,
                                                                     const VkAllocationCallbacks *pAllocator) {
     struct loader_instance *inst = (struct loader_instance *)instance;
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) - non-dispatchable handle; round-trip via uintptr_t is required
     uint32_t *debug_report_index = (uint32_t *)(uintptr_t)callback;
     // Make sure that callback actually points to anything
     if (NULL == debug_report_index) {
         return;
     }
     for (struct loader_icd_term *icd_term = inst->icd_terms; icd_term; icd_term = icd_term->next) {
-        if (icd_term->debug_report_callback_list.list && icd_term->debug_report_callback_list.list[*debug_report_index] &&
+        if (icd_term->debug_report_callback_list.list &&
+            icd_term->debug_report_callback_list.capacity > *debug_report_index * sizeof(VkDebugReportCallbackEXT) &&
+            icd_term->debug_report_callback_list.list[*debug_report_index] &&
             NULL != icd_term->dispatch.DestroyDebugReportCallbackEXT) {
             icd_term->dispatch.DestroyDebugReportCallbackEXT(
                 icd_term->instance, icd_term->debug_report_callback_list.list[*debug_report_index], pAllocator);
@@ -584,6 +602,7 @@ VKAPI_ATTR void VKAPI_CALL terminator_DebugReportMessageEXT(VkInstance instance,
     // Now that all ICDs have seen the message, call the necessary callbacks.  Ignoring "bail" return value
     // as there is nothing to bail from at this point.
 
+    // NOLINTNEXTLINE(readability-suspicious-call-argument) - objType/object correctly forward to objectType/srcObject in API order
     util_DebugReportMessage(inst, flags, objType, object, location, msgCode, pLayerPrefix, pMsg);
 
     loader_platform_thread_unlock_mutex(&loader_lock);
@@ -649,6 +668,7 @@ bool debug_utils_ReportFlagsToAnnotFlags(VkDebugReportFlagsEXT dr_flags, bool de
         return false;
     }
     *da_type = 0;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange) - external Vulkan enum has no zero value we can add
     *da_severity = 0;
 
     if ((dr_flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) != 0) {
@@ -678,6 +698,7 @@ bool debug_utils_ReportFlagsToAnnotFlags(VkDebugReportFlagsEXT dr_flags, bool de
     return true;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) - mirrors VkDebugUtilsMessengerCallbackDataEXT severity/type fields
 bool debug_utils_AnnotFlagsToReportFlags(VkDebugUtilsMessageSeverityFlagBitsEXT da_severity,
                                          VkDebugUtilsMessageTypeFlagsEXT da_type, VkDebugReportFlagsEXT *dr_flags) {
     if (NULL == dr_flags) {
@@ -703,6 +724,7 @@ bool debug_utils_AnnotFlagsToReportFlags(VkDebugUtilsMessageSeverityFlagBitsEXT 
     return true;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) - mirrors the VkDebugReportCallbackEXT objectType/object parameters
 bool debug_utils_ReportObjectToAnnotObject(VkDebugReportObjectTypeEXT dr_object_type, uint64_t object_handle,
                                            VkDebugUtilsObjectNameInfoEXT *da_object_name_info) {
     if (NULL == da_object_name_info) {

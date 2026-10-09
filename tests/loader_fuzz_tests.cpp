@@ -27,7 +27,10 @@
 
 #include "framework/test_environment.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <vector>
 
 extern "C" {
 #include "loader.h"
@@ -161,12 +164,12 @@ void execute_setting_fuzzer(std::filesystem::path const& filename) {
 
 TEST(BadJsonInput, ClusterFuzzTestCase_5599244505186304) {
     // Doesn't crash with ASAN or UBSAN
-    // Doesn't reproducibly crash - instance_create_fuzzer: Abrt in loader_cJSON_Delete
+    // Doesn't reproducibly crash - instance_create_fuzzer: Abort in loader_cJSON_Delete
     execute_instance_create_fuzzer("clusterfuzz-testcase-instance_create_fuzzer-5599244505186304");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5126563864051712) {
     // Doesn't crash with ASAN or UBSAN
-    // Doesn't reproducibly crash - instance_enumerate_fuzzer: Abrt in loader_cJSON_Delete
+    // Doesn't reproducibly crash - instance_enumerate_fuzzer: Abort in loader_cJSON_Delete
     execute_instance_enumerate_fuzzer("clusterfuzz-testcase-instance_enumerate_fuzzer-5126563864051712");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_6308459683315712) {
@@ -185,12 +188,12 @@ TEST(BadJsonInput, ClusterFuzzTestCase_6470575830925312) {
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5258042868105216) {
     // Doesn't crash with ASAN or UBSAN
-    // Doesn't reproducibly crash - json_load_fuzzer: Abrt in loader_cJSON_Delete
+    // Doesn't reproducibly crash - json_load_fuzzer: Abort in loader_cJSON_Delete
     execute_json_load_fuzzer("clusterfuzz-testcase-json_load_fuzzer-5258042868105216");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5487817455960064) {
     // Doesn't crash with ASAN or UBSAN
-    // Doesn't reproducibly crash - json_load_fuzzer: Abrt in std::__Fuzzer::vector<std::__Fuzzer::pair<unsigned int, unsigned
+    // Doesn't reproducibly crash - json_load_fuzzer: Abort in std::__Fuzzer::vector<std::__Fuzzer::pair<unsigned int, unsigned
     // short>, std::__
     execute_json_load_fuzzer("clusterfuzz-testcase-json_load_fuzzer-5487817455960064");
 }
@@ -215,7 +218,7 @@ TEST(BadJsonInput, ClusterFuzzTestCase_4820577276723200) {
 TEST(BadJsonInput, ClusterFuzzTestCase_5177827962454016) {
     // Does crash with UBSAN and ASAN
     // free(): invalid next size (fast)
-    // instance_create_fuzzer: Abrt in instance_create_fuzzer
+    // instance_create_fuzzer: Abort in instance_create_fuzzer
     execute_instance_create_fuzzer("clusterfuzz-testcase-minimized-instance_create_fuzzer-5177827962454016");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5198773675425792) {
@@ -297,13 +300,13 @@ TEST(BadJsonInput, ClusterFuzzTestCase_5347670374612992) {
 TEST(BadJsonInput, ClusterFuzzTestCase_5392928643547136) {
     // Does crash with UBSAN and ASAN
     // free(): corrupted unsorted chunks
-    // json_load_fuzzer: Abrt in std::__Fuzzer::basic_filebuf<char, std::__Fuzzer::char_traits<char>>::~basic_fil
+    // json_load_fuzzer: Abort in std::__Fuzzer::basic_filebuf<char, std::__Fuzzer::char_traits<char>>::~basic_fil
     execute_json_load_fuzzer("clusterfuzz-testcase-minimized-json_load_fuzzer-5392928643547136");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5636386303049728) {
     // Does crash with UBSAN and ASAN
     // terminate called after throwing an instance of 'std::bad_alloc' what():  std::bad_alloc
-    // json_load_fuzzer: Abrt in json_load_fuzzer
+    // json_load_fuzzer: Abort in json_load_fuzzer
     execute_json_load_fuzzer("clusterfuzz-testcase-minimized-json_load_fuzzer-5636386303049728");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_6182254813249536) {
@@ -329,7 +332,7 @@ TEST(BadJsonInput, ClusterFuzzTestCase_6482033715838976) {
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_4857714377818112) {
     // Does crash with UBSAN and ASAN
-    // settings_fuzzer: Abrt in settings_fuzzer
+    // settings_fuzzer: Abort in settings_fuzzer
     execute_setting_fuzzer("clusterfuzz-testcase-minimized-settings_fuzzer-4857714377818112");
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_5123849246867456) {
@@ -340,4 +343,76 @@ TEST(BadJsonInput, ClusterFuzzTestCase_5123849246867456) {
 }
 TEST(BadJsonInput, ClusterFuzzTestCase_4626669072875520) {
     execute_setting_fuzzer("clusterfuzz-testcase-minimized-settings_fuzzer-4626669072875520");
+}
+
+// A string that ends in the middle of a multi-byte UTF-8 character must not make vk_string_validate read
+// past the terminator. Each buffer is sized to its exact contents so ASAN flags any over-read.
+TEST(StringValidation, TruncatedMultiByteDoesNotReadPastTerminator) {
+    // 2-, 3- and 4-byte lead bytes, each immediately followed by the terminator.
+    for (unsigned char lead : {0xC2u, 0xE2u, 0xF0u}) {
+        std::vector<char> truncated = {static_cast<char>(lead), '\0'};
+        EXPECT_EQ(vk_string_validate(MaxLoaderStringLength, truncated.data()), VK_STRING_ERROR_BAD_DATA);
+    }
+    // A lead byte with one valid continuation byte but still short of the required count.
+    std::vector<char> short_seq = {static_cast<char>(0xE2), static_cast<char>(0x82), '\0'};
+    EXPECT_EQ(vk_string_validate(MaxLoaderStringLength, short_seq.data()), VK_STRING_ERROR_BAD_DATA);
+
+    // Well-formed strings still validate cleanly.
+    std::vector<char> ascii = {'a', 'b', 'c', '\0'};
+    EXPECT_EQ(vk_string_validate(MaxLoaderStringLength, ascii.data()), VK_STRING_ERROR_NONE);
+    std::vector<char> two_byte = {static_cast<char>(0xC2), static_cast<char>(0xA9), '\0'};
+    EXPECT_EQ(vk_string_validate(MaxLoaderStringLength, two_byte.data()), VK_STRING_ERROR_NONE);
+}
+
+// The loader's fork of print_string_ptr strips the escaping backslash, so it writes fewer bytes than the
+// upstream escape budget it terminates at. It must terminate at the real end, otherwise the gap up to that
+// larger length is read back as part of the string. PrintPreallocated hands the result to a caller-owned
+// buffer that is not required to be zeroed, so any stale bytes in the gap leak out.
+TEST(JsonStringPrint, PrintPreallocatedTerminatesAtRealEnd) {
+    std::filesystem::path json_path = std::filesystem::temp_directory_path() / "loader_print_string_ptr_test.json";
+    {
+        std::ofstream f(json_path, std::ios::binary | std::ios::trunc);
+        // Top-level JSON string whose decoded value needs escaping: decodes to a b <LF> c d \ e f (8 bytes).
+        f << "\"ab\\ncd\\\\ef\"";
+    }
+
+    cJSON* json = NULL;
+    ASSERT_EQ(loader_get_json(NULL, json_path.string().c_str(), &json), VK_SUCCESS);
+    ASSERT_NE(json, nullptr);
+
+    // Caller owns the buffer and it need not be zeroed - poison it so a short-write shows up.
+    char buffer[64];
+    for (char& c : buffer) c = 'X';
+    ASSERT_TRUE(loader_cJSON_PrintPreallocated(json, buffer, static_cast<int>(sizeof(buffer)), false));
+
+    const char expected[] = {'a', 'b', '\n', 'c', 'd', '\\', 'e', 'f', '\0'};
+    EXPECT_STREQ(buffer, expected);
+
+    loader_cJSON_Delete(json);
+    std::filesystem::remove(json_path);
+}
+
+// extensionName is a fixed VK_MAX_EXTENSION_NAME_SIZE array which the loader copies verbatim from a driver's
+// VkExtensionProperties. A non-conformant ICD can fill all VK_MAX_EXTENSION_NAME_SIZE bytes with no null
+// terminator; comparing two such names with an unbounded strcmp reads past the end of the array (and, at the
+// end of a list, past the allocation). compare_vk_extension_properties must bound the compare to the field.
+TEST(ExtensionNameCompare, UnterminatedNameDoesNotReadPastField) {
+    // Allocate each VkExtensionProperties in its own exact-sized block so an over-read runs into the ASAN redzone.
+    VkExtensionProperties* a = static_cast<VkExtensionProperties*>(malloc(sizeof(VkExtensionProperties)));
+    VkExtensionProperties* b = static_cast<VkExtensionProperties*>(malloc(sizeof(VkExtensionProperties)));
+    ASSERT_NE(a, nullptr);
+    ASSERT_NE(b, nullptr);
+    // Fill every byte (extensionName and specVersion) with a non-null value: no terminator anywhere in the object.
+    memset(a, 'A', sizeof(VkExtensionProperties));
+    memset(b, 'A', sizeof(VkExtensionProperties));
+
+    // Equal within the field: must report a match without reading past VK_MAX_EXTENSION_NAME_SIZE.
+    EXPECT_TRUE(compare_vk_extension_properties(a, b));
+
+    // Differ inside the field: must report no match, again without over-reading.
+    b->extensionName[VK_MAX_EXTENSION_NAME_SIZE - 1] = 'B';
+    EXPECT_FALSE(compare_vk_extension_properties(a, b));
+
+    free(a);
+    free(b);
 }

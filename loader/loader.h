@@ -67,10 +67,6 @@ static inline VkLayerInstanceDispatchTable *loader_get_instance_layer_dispatch(c
     return *((VkLayerInstanceDispatchTable **)obj);
 }
 
-static inline struct loader_instance_dispatch_table *loader_get_instance_dispatch(const void *obj) {
-    return *((struct loader_instance_dispatch_table **)obj);
-}
-
 static inline void loader_init_dispatch(void *obj, const void *data) {
 #if defined(DEBUG)
     assert(valid_loader_magic_value(obj) &&
@@ -86,14 +82,14 @@ extern struct loader_struct loader;
 extern loader_platform_thread_mutex loader_lock;
 extern loader_platform_thread_mutex loader_preload_icd_lock;
 
-bool compare_vk_extension_properties(const VkExtensionProperties *op1, const VkExtensionProperties *op2);
+TEST_FUNCTION_EXPORT bool compare_vk_extension_properties(const VkExtensionProperties *op1, const VkExtensionProperties *op2);
 
 VkResult loader_validate_layers(const struct loader_instance *inst, const uint32_t layer_count,
                                 const char *const *ppEnabledLayerNames, const struct loader_layer_list *list);
 
 VkResult loader_validate_instance_extensions(struct loader_instance *inst, const struct loader_extension_list *icd_exts,
                                              const struct loader_layer_list *instance_layer,
-                                             const struct loader_envvar_all_filters *layer_filters,
+                                             const struct loader_pointer_layer_list *expanded_layers,
                                              const VkInstanceCreateInfo *pCreateInfo);
 
 #if defined(_WIN32)
@@ -114,6 +110,10 @@ VkResult create_string_list(const struct loader_instance *inst, uint32_t allocat
 // Resize if there isn't enough space, then add the string str to the end of the loader_string_list
 // This function takes ownership of the str passed in
 VkResult append_str_to_string_list(const struct loader_instance *inst, struct loader_string_list *string_list, char *str);
+// Checks that the string doesn't already exist in the list, resizes if there isn't enough space, adds the string str to the end of
+// the loader_string_list.
+// This function takes ownership of the str passed in
+VkResult append_str_to_string_list_if_unique(const struct loader_instance *inst, struct loader_string_list *string_list, char *str);
 // Resize if there isn't enough space, then add the string str to the start of the loader_string_list
 // This function takes ownership of the str passed in
 VkResult prepend_str_to_string_list(const struct loader_instance *inst, struct loader_string_list *string_list, char *str);
@@ -123,12 +123,22 @@ VkResult prepend_str_to_string_list(const struct loader_instance *inst, struct l
 // The str_len parameter does not include the null terminator
 VkResult copy_str_to_string_list(const struct loader_instance *inst, struct loader_string_list *string_list, const char *str,
                                  size_t str_len);
+// Checks that the string doesn't already exist in the list, then copies the string str to a new string and append it to
+// string_list, resizing string_list if there isn't enough space.
+// This function does not take ownership of the string, it merely copies it.
+// This function automatically appends a null terminator to the string being copied The str_len parameter does not
+// include the null terminator
+VkResult copy_str_to_string_list_if_unique(const struct loader_instance *inst, struct loader_string_list *string_list,
+                                           const char *str, size_t str_len);
 // Copy the string str to a new string and prepend it to string_list, resizing string_list if there isn't enough space.
 // This function does not take ownership of the string, it merely copies it.
 // This function automatically appends a null terminator to the string being copied
 // The str_len parameter does not include the null terminator
 VkResult copy_str_to_start_of_string_list(const struct loader_instance *inst, struct loader_string_list *string_list,
                                           const char *str, size_t str_len);
+
+// Remove the first string equal to str from string_list and free it, if there is one
+void remove_str_from_string_list(const struct loader_instance *inst, struct loader_string_list *string_list, const char *str);
 
 // Free any string inside of loader_string_list and then free the list itself
 void free_string_list(const struct loader_instance *inst, struct loader_string_list *string_list);
@@ -147,22 +157,18 @@ VkResult loader_append_layer_property(const struct loader_instance *inst, struct
 VkResult loader_add_layer_properties(const struct loader_instance *inst, struct loader_layer_list *layer_instance_list, cJSON *json,
                                      bool is_implicit, char *filename);
 bool loader_find_layer_name_in_list(const char *name, const struct loader_pointer_layer_list *layer_list);
-VkResult loader_add_layer_properties_to_list(const struct loader_instance *inst, struct loader_pointer_layer_list *list,
-                                             struct loader_layer_properties *props);
+VkResult loader_add_layer_properties_to_list(struct loader_instance *inst, struct loader_layer_properties *props);
 void loader_free_layer_properties(const struct loader_instance *inst, struct loader_layer_properties *layer_properties);
 bool loader_implicit_layer_is_enabled(const struct loader_instance *inst, const struct loader_envvar_all_filters *filters,
                                       const struct loader_layer_properties *prop);
-VkResult loader_add_meta_layer(const struct loader_instance *inst, const struct loader_envvar_all_filters *filters,
-                               struct loader_layer_properties *prop, struct loader_pointer_layer_list *target_list,
-                               struct loader_pointer_layer_list *expanded_target_list, const struct loader_layer_list *source_list,
-                               bool *out_found_all_component_layers);
+VkResult loader_add_meta_layer(struct loader_instance *inst, const struct loader_envvar_all_filters *filters,
+                               struct loader_layer_properties *prop, bool *out_found_all_component_layers);
 VkResult loader_add_to_ext_list(const struct loader_instance *inst, struct loader_extension_list *ext_list,
                                 uint32_t prop_list_count, const VkExtensionProperties *props);
 VkResult loader_add_device_extensions(const struct loader_instance *inst,
                                       PFN_vkEnumerateDeviceExtensionProperties fpEnumerateDeviceExtensionProperties,
                                       VkPhysicalDevice physical_device, const char *lib_name,
                                       struct loader_extension_list *ext_list);
-VkResult loader_init_generic_list(const struct loader_instance *inst, struct loader_generic_list *list_info, size_t element_size);
 void loader_destroy_generic_list(const struct loader_instance *inst, struct loader_generic_list *list);
 void loader_destroy_pointer_layer_list(const struct loader_instance *inst, struct loader_pointer_layer_list *layer_list);
 TEST_FUNCTION_EXPORT void loader_delete_layer_list_and_properties(const struct loader_instance *inst,
@@ -183,7 +189,7 @@ VkResult loader_scan_for_implicit_layers(struct loader_instance *inst, struct lo
 VkResult loader_get_icd_loader_instance_extensions(const struct loader_instance *inst, struct loader_icd_tramp_list *icd_tramp_list,
                                                    struct loader_extension_list *inst_exts);
 struct loader_icd_term *loader_get_icd_and_device(const void *device, struct loader_device **found_dev);
-struct loader_instance *loader_get_instance(const VkInstance instance);
+struct loader_instance *loader_get_instance(VkInstance instance);
 loader_platform_dl_handle loader_open_layer_file(const struct loader_instance *inst, struct loader_layer_properties *prop);
 struct loader_device *loader_create_logical_device(const struct loader_instance *inst, const VkAllocationCallbacks *pAllocator);
 void loader_add_logical_device(struct loader_icd_term *icd_term, struct loader_device *found_dev);
@@ -194,7 +200,6 @@ void loader_remove_logical_device(struct loader_icd_term *icd_term, struct loade
 void loader_destroy_logical_device(struct loader_device *dev, const VkAllocationCallbacks *pAllocator);
 
 VkResult loader_enable_instance_layers(struct loader_instance *inst, const VkInstanceCreateInfo *pCreateInfo,
-                                       const struct loader_layer_list *instance_layers,
                                        const struct loader_envvar_all_filters *layer_filters);
 
 VkResult loader_create_instance_chain(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator,
@@ -209,7 +214,7 @@ VKAPI_ATTR VkResult VKAPI_CALL loader_layer_create_device(VkInstance instance, V
 VKAPI_ATTR void VKAPI_CALL loader_layer_destroy_device(VkDevice device, const VkAllocationCallbacks *pAllocator,
                                                        PFN_vkDestroyDevice destroyFunction);
 
-VkResult loader_create_device_chain(const VkPhysicalDevice pd, const VkDeviceCreateInfo *pCreateInfo,
+VkResult loader_create_device_chain(VkPhysicalDevice pd, const VkDeviceCreateInfo *pCreateInfo,
                                     const VkAllocationCallbacks *pAllocator, const struct loader_instance *inst,
                                     struct loader_device *dev, PFN_vkGetInstanceProcAddr callingLayer,
                                     PFN_vkGetDeviceProcAddr *layerNextGDPA);
@@ -226,11 +231,12 @@ void unload_drivers_without_physical_devices(struct loader_instance *inst);
 VkResult loader_apply_settings_device_configurations(struct loader_instance *inst, uint32_t *pPhysicalDeviceCount,
                                                      VkPhysicalDevice *pPhysicalDevices);
 
-VkStringErrorFlags vk_string_validate(const int max_length, const char *char_array);
+TEST_FUNCTION_EXPORT VkStringErrorFlags vk_string_validate(const int max_length, const char *utf8);
 char *loader_get_next_path(char *path);
 VkResult add_if_manifest_file(const struct loader_instance *inst, const char *file_name, struct loader_string_list *out_files);
 VkResult prepend_if_manifest_file(const struct loader_instance *inst, const char *file_name, struct loader_string_list *out_files);
-VkResult add_data_files(const struct loader_instance *inst, char *search_path, struct loader_string_list *out_files);
+VkResult add_data_files(const struct loader_instance *inst, struct loader_string_list *search_paths,
+                        struct loader_string_list *out_files);
 
 loader_api_version loader_make_version(uint32_t version);
 loader_api_version loader_combine_version(uint32_t major, uint32_t minor, uint32_t patch);
@@ -238,13 +244,16 @@ loader_api_version loader_combine_version(uint32_t major, uint32_t minor, uint32
 // Helper macros for determining if a version is valid or not
 bool loader_check_version_meets_required(loader_api_version required, loader_api_version version);
 
-VkResult loader_filter_enumerated_physical_device(const struct loader_instance *inst,
-                                                  const struct loader_envvar_id_filter *device_id_filter,
-                                                  const struct loader_envvar_id_filter *vendor_id_filter,
-                                                  const struct loader_envvar_id_filter *driver_id_filter,
-                                                  const uint32_t in_PhysicalDeviceCount,
-                                                  const VkPhysicalDevice *in_pPhysicalDevices, uint32_t *out_pPhysicalDeviceCount,
-                                                  VkPhysicalDevice *out_pPhysicalDevices);
+// Helper that returns true if the string passed in path ends in .json
+bool is_json(const char *path, size_t len);
+
+VkResult loader_filter_enumerated_physical_devices(const struct loader_instance *inst,
+                                                   const struct loader_envvar_id_filter *device_id_filter,
+                                                   const struct loader_envvar_id_filter *vendor_id_filter,
+                                                   const struct loader_envvar_id_filter *driver_id_filter,
+                                                   const uint32_t in_PhysicalDeviceCount,
+                                                   const VkPhysicalDevice *in_pPhysicalDevices, uint32_t *out_pPhysicalDeviceCount,
+                                                   VkPhysicalDevice *out_pPhysicalDevices);
 
 VkResult loader_filter_enumerated_physical_device_groups(
     const struct loader_instance *inst, const struct loader_envvar_id_filter *device_id_filter,
