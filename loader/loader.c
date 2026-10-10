@@ -2542,12 +2542,9 @@ void loader_get_fullpath(const char *file, const char *in_dirs, size_t out_size,
         // for (dir = dirs_copy; *dir && (next_dir = loader_get_next_path(dir)); dir = next_dir) {
         char *dir = dirs_copy;
         char *next_dir = loader_get_next_path(dir);
-        while (*dir && next_dir) {
+        while (*dir && next_dir && out_fullpath) {
             int path_concat_ret = snprintf(out_fullpath, out_size, "%s%c%s", dir, DIRECTORY_SYMBOL, file);
-            if (path_concat_ret < 0) {
-                continue;
-            }
-            if (loader_platform_file_exists(out_fullpath)) {
+            if (path_concat_ret >= 0 && loader_platform_file_exists(out_fullpath)) {
                 return;
             }
             dir = next_dir;
@@ -7297,12 +7294,12 @@ VkResult loader_apply_settings_device_configurations(struct loader_instance *ins
                 }
                 if (pd_details[j].pd_supports_driver_properties) {
                     loader_log(inst, VULKAN_LOADER_DEBUG_BIT, 0,
-                               "pPhysicalDevices array index %d is set to \"%s\" (%s, version %d) ", written_output_index,
+                               "pPhysicalDevices array index %d is set to \"%s\" (%s, version %u) ", written_output_index,
                                pd_details[j].properties.deviceName, pd_details[j].driver_properties.driverName,
                                pd_details[j].properties.driverVersion);
                 } else {
                     loader_log(inst, VULKAN_LOADER_DEBUG_BIT, 0,
-                               "pPhysicalDevices array index %d is set to \"%s\" (driver version %d) ", written_output_index,
+                               "pPhysicalDevices array index %d is set to \"%s\" (driver version %u) ", written_output_index,
                                pd_details[j].properties.deviceName, pd_details[j].properties.driverVersion);
                 }
                 pPhysicalDevices[written_output_index++] = (VkPhysicalDevice)inst->phys_devs_term[j];
@@ -7323,7 +7320,7 @@ VkResult loader_apply_settings_device_configurations(struct loader_instance *ins
                     inst, VULKAN_LOADER_WARN_BIT, 0,
                     "loader_apply_settings_device_configurations: settings file contained device_configuration which does not "
                     "appear in the enumerated VkPhysicalDevices. Missing VkPhysicalDevice with deviceName: \"%s\", "
-                    "deviceUUID: %s, driverName: %s, driverUUID: %s, driverVersion: %d",
+                    "deviceUUID: %s, driverName: %s, driverUUID: %s, driverVersion: %u",
                     inst->settings.device_configurations[i].deviceName, device_uuid_str,
                     inst->settings.device_configurations[i].driverName, driver_uuid_str,
                     inst->settings.device_configurations[i].driverVersion);
@@ -7332,7 +7329,7 @@ VkResult loader_apply_settings_device_configurations(struct loader_instance *ins
                     inst, VULKAN_LOADER_WARN_BIT, 0,
                     "loader_apply_settings_device_configurations: settings file contained device_configuration which does not "
                     "appear in the enumerated VkPhysicalDevices. Missing VkPhysicalDevice with deviceName: \"%s\", "
-                    "deviceUUID: %s, driverUUID: %s, driverVersion: %d",
+                    "deviceUUID: %s, driverUUID: %s, driverVersion: %u",
                     inst->settings.device_configurations[i].deviceName, device_uuid_str, driver_uuid_str,
                     inst->settings.device_configurations[i].driverVersion);
             } else {
@@ -7340,7 +7337,7 @@ VkResult loader_apply_settings_device_configurations(struct loader_instance *ins
                     inst, VULKAN_LOADER_WARN_BIT, 0,
                     "loader_apply_settings_device_configurations: settings file contained device_configuration which does not "
                     "appear in the enumerated VkPhysicalDevices. Missing VkPhysicalDevice with deviceUUID: "
-                    "%s, driverUUID: %s, driverVersion: %d",
+                    "%s, driverUUID: %s, driverVersion: %u",
                     device_uuid_str, driver_uuid_str, inst->settings.device_configurations[i].driverVersion);
             }
         }
@@ -7785,6 +7782,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_EnumeratePhysicalDeviceGroups(
                            "terminator_EnumeratePhysicalDeviceGroups:  Failed during dispatch call of \'EnumeratePhysicalDevices\' "
                            "to ICD %s to get plain phys dev count.",
                            icd_term->scanned_icd->lib_name);
+                icd_term = icd_term->next;
                 continue;
             }
         } else {
@@ -7795,6 +7793,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_EnumeratePhysicalDeviceGroups(
                            "terminator_EnumeratePhysicalDeviceGroups:  Failed during dispatch call of "
                            "\'EnumeratePhysicalDeviceGroups\' to ICD %s to get count.",
                            icd_term->scanned_icd->lib_name);
+                icd_term = icd_term->next;
                 continue;
             }
         }
