@@ -4874,6 +4874,8 @@ VKAPI_ATTR VkResult VKAPI_CALL loader_layer_create_device(VkInstance instance, V
     struct loader_device *dev = NULL;
     struct loader_instance *inst = NULL;
 
+    loader_platform_thread_lock_mutex(&loader_lock);
+
     if (instance != VK_NULL_HANDLE) {
         inst = loader_get_instance(instance);
         internal_device = physicalDevice;
@@ -4974,6 +4976,8 @@ out:
     if (NULL != icd_exts.list) {
         loader_destroy_generic_list(inst, (struct loader_generic_list *)&icd_exts);
     }
+    loader_platform_thread_unlock_mutex(&loader_lock);
+
     return res;
 }
 
@@ -4985,6 +4989,8 @@ VKAPI_ATTR void VKAPI_CALL loader_layer_destroy_device(VkDevice device, const Vk
         return;
     }
 
+    loader_platform_thread_lock_mutex(&loader_lock);
+
     struct loader_icd_term *icd_term = loader_get_icd_and_device(device, &dev);
 
     destroyFunction(device, pAllocator);
@@ -4993,6 +4999,7 @@ VKAPI_ATTR void VKAPI_CALL loader_layer_destroy_device(VkDevice device, const Vk
         dev->icd_device = NULL;
         loader_remove_logical_device(icd_term, dev, pAllocator);
     }
+    loader_platform_thread_unlock_mutex(&loader_lock);
 }
 
 // Given the list of layers to activate in the loader_instance
@@ -5587,13 +5594,10 @@ VkResult loader_create_device_chain(VkPhysicalDevice pd, const VkDeviceCreateInf
         create_info_disp.pNext = loader_create_info.pNext;
         loader_create_info.pNext = &create_info_disp;
         res = fpCreateDevice(pd, &loader_create_info, pAllocator, &created_device);
-        if (res != VK_SUCCESS) {
-            return res;
-        }
-        dev->chain_device = created_device;
 
         // Because we changed the pNext chain to use our own VkDeviceGroupDeviceCreateInfo, we need to fixup the chain to
-        // point back at the original VkDeviceGroupDeviceCreateInfo.
+        // point back at the original VkDeviceGroupDeviceCreateInfo. This must happen even if device creation failed, otherwise
+        // the caller's chain is left pointing at our stack allocated copy.
         VkBaseOutStructure *pNext = (VkBaseOutStructure *)loader_create_info.pNext;
         VkBaseOutStructure *pPrev = (VkBaseOutStructure *)&loader_create_info;
         while (NULL != pNext) {
@@ -5609,6 +5613,10 @@ VkResult loader_create_device_chain(VkPhysicalDevice pd, const VkDeviceCreateInf
             pNext = pNext->pNext;
         }
 
+        if (res != VK_SUCCESS) {
+            return res;
+        }
+        dev->chain_device = created_device;
     } else {
         loader_log(inst, VULKAN_LOADER_ERROR_BIT, 0,
                    "loader_create_device_chain: Failed to find \'vkCreateDevice\' in layers or ICD");
